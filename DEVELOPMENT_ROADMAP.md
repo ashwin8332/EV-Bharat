@@ -9,18 +9,25 @@
 ### Tasks
 - [ ] Set up development environment (Python, IDEs)
 - [ ] Purchase hardware components (ESP32, sensors)
+- [ ] Procure VLC link parts (LED driver, high-power LED, photodiode + TIA, optics)
 - [ ] Research and select APIs (Google Maps, traffic APIs)
 - [ ] Set up version control (Git)
 - [ ] Install Arduino IDE / PlatformIO
 
 ### Deliverables
 - ✅ All hardware components procured
+- ✅ VLC optical link BOM received (TX: LED + driver, RX: photodiode + TIA + optics)
 - ✅ Development environment configured
 - ✅ Git repository initialized
 - ✅ API keys obtained
 
 ### Resources Needed
 - Budget: ₹3,000-5,000 for hardware
+- VLC components:
+  - High-power white/blue LED (TX) with constant-current driver
+  - Photodiode or PIN diode (RX) with transimpedance amplifier
+  - Optical lenses/diffusers and light baffles to improve SNR
+  - Heatsink + small fan for LED thermal management
 - Google Maps API key (free tier)
 - TomTom API key (free tier)
 
@@ -31,14 +38,14 @@
 ### Tasks
 - [ ] Assemble car model with sensors
 - [ ] Write firmware for ESP32 (sensor reading)
-- [ ] Implement WiFi/MQTT connectivity
-- [ ] Test wireless data transmission
+- [ ] Implement VLC telemetry link with MQTT payloads
+- [ ] Test VLC line-of-sight data transmission
 - [ ] Set up MQTT broker (local/cloud)
 
 ### Deliverables
 - ✅ Working ESP32 with all sensors connected
 - ✅ Firmware reading sensor data accurately
-- ✅ MQTT communication established
+- ✅ VLC link + MQTT payload communication established
 - ✅ JSON payload structure defined
 
 ### Code Components
@@ -53,7 +60,7 @@ firmware/
 ### Testing Criteria
 - Sensors read data every 5 seconds
 - MQTT messages published successfully
-- WiFi reconnection on disconnect
+- VLC link re-syncs within 2 seconds after occlusion
 - Battery life > 2 hours on Li-ion
 
 ---
