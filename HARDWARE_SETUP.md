@@ -19,7 +19,7 @@
 │                            │                                      │
 │  ┌─────────────────────────▼────────────────────────────────┐   │
 │  │         MICROCONTROLLER UNIT (MCU)                        │   │
-│  │  • ESP32 (WiFi + BLE) / NodeMCU / Raspberry Pi            │   │
+│  │  • ESP32 / NodeMCU / Raspberry Pi                         │   │
 │  │  • Data aggregation and preprocessing                     │   │
 │  │  • Protocol handling (MQTT/HTTP/WebSocket)                │   │
 │  │  • Edge computing for basic analytics                     │   │
@@ -27,11 +27,11 @@
 │                            │                                      │
 │  ┌─────────────────────────▼────────────────────────────────┐   │
 │  │         WIRELESS COMMUNICATION LAYER                      │   │
-│  │  ┌───────────┬──────────┬──────────┬──────────────────┐  │   │
-│  │  │ WiFi      │ Bluetooth│ LoRaWAN  │ 4G/5G Module     │  │   │
-│  │  │ (Local)   │ LE (BLE) │ (Long    │ (SIM800/SIM7600) │  │   │
-│  │  │           │          │ Range)   │                  │  │   │
-│  │  └───────────┴──────────┴──────────┴──────────────────┘  │   │
+│  │  ┌───────────┬──────────┬──────────────────┐            │   │
+│  │  │ VLC       │ LoRaWAN  │ 4G/5G Module     │            │   │
+│  │  │ (Line-of- │ (Long    │ (SIM800/SIM7600) │            │   │
+│  │  │ sight)    │ Range)   │                  │            │   │
+│  │  └───────────┴──────────┴──────────────────┘            │   │
 │  └────────────────────────────────────────────────────────────┘ │
 └────────────────────────┬───────────────────────────────────────┘
                          │
@@ -76,13 +76,12 @@
 
 | Protocol   | Range       | Power    | Data Rate | Use Case                    |
 |------------|-------------|----------|-----------|----------------------------|
-| **WiFi**   | 50-100m     | High     | High      | Local testing, debugging    |
-| **BLE**    | 10-50m      | Very Low | Low       | Smartphone app connection   |
+| **VLC**    | 2-20m LOS   | Medium   | High      | Lab/indoor telemetry link   |
 | **LoRaWAN**| 2-15km      | Low      | Low       | Long-range rural areas      |
 | **4G/5G**  | Wide area   | Medium   | Very High | Production deployment       |
 | **MQTT**   | Protocol layer          | -         | Lightweight pub/sub messaging |
 
-**Recommendation**: Start with **WiFi + MQTT** for prototyping, upgrade to **4G/5G** for real-world deployment.
+**Recommendation**: Start with **VLC + MQTT** (optical bridge) for prototyping; use **4G/5G** for field deployment.
 
 ---
 
@@ -102,6 +101,18 @@
 | **Display (Optional)** | 0.96" OLED I2C | 1 | ₹200-350 |
 | **Breadboard** | 830 points | 1 | ₹100-200 |
 | **Jumper Wires** | M-M, M-F, F-F | Set | ₹100-150 |
+
+### VLC Link Components (Required)
+
+| Component | Specification | Quantity | Approx. Cost (INR) |
+|-----------|---------------|----------|-------------------|
+| **TX LED + Driver** | 1-3W high-power white/blue LED with constant-current driver (350-700mA) | 1 | ₹250-500 |
+| **Optics (TX)** | Collimating lens or diffuser for LED | 1 | ₹100-200 |
+| **Photodiode (RX)** | PIN photodiode or phototransistor | 1 | ₹150-300 |
+| **TIA Module (RX)** | Transimpedance amplifier (e.g., OPA381/LM358 breakout) | 1 | ₹150-300 |
+| **Optics (RX)** | Focusing lens + light baffle to reduce ambient noise | 1 | ₹150-300 |
+| **Heatsink/Fan** | For LED thermal management | 1 | ₹100-200 |
+| **Enclosure Mounts** | Brackets to maintain line-of-sight alignment | 2 | ₹100-150 |
 
 ### For Physical Car Model
 
@@ -123,6 +134,7 @@
 | **Accelerometer** | Motion detection | ₹150-250 |
 
 **Total Estimated Cost**: ₹3,000 - 5,000 (Basic setup)
+**Additional for VLC Link**: ₹900 - 1,700
 
 ---
 
@@ -158,8 +170,8 @@ Create JSON Payload
 }
          │
          ▼
-Transmit via WiFi/4G (MQTT Publish)
-  Topic: "ev/telemetry/EV_001"
+Transmit via VLC optical link (JSON over UART)
+  Topic (at gateway MQTT bridge): "ev/telemetry/EV_001"
          │
          ▼
 Cloud MQTT Broker receives
@@ -214,12 +226,12 @@ Power Supply
 1. Install Arduino IDE + ESP32 board support
 2. Upload sensor test code
 3. Verify serial monitor output
-4. Test WiFi connectivity
+4. Test VLC TX/RX by placing emitter/receiver 2-5m apart; confirm packets arrive at gateway
 
 ### Step 4: MQTT Setup
-1. Install MQTT broker (Mosquitto) on server/cloud
-2. Configure ESP32 with broker credentials
-3. Test publish/subscribe functionality
+1. Install MQTT broker (Mosquitto) on server/cloud or gateway
+2. Configure gateway to publish VLC-received UART frames to MQTT
+3. Test publish/subscribe functionality end-to-end (ESP32 → VLC → gateway → broker)
 
 ### Step 5: Car Integration (Optional)
 1. Mount components on chassis
@@ -231,53 +243,42 @@ Power Supply
 
 ## 🔧 Firmware Development
 
-### Quick Start Code (ESP32 + WiFi + MQTT)
+### Quick Start Code (ESP32 → VLC UART → MQTT Gateway)
 
 ```cpp
-#include <WiFi.h>
-#include <PubSubClient.h>
+#include <ArduinoJson.h>
 #include <DHT.h>
 
-// WiFi credentials
-const char* ssid = "YOUR_WIFI_SSID";
-const char* password = "YOUR_WIFI_PASSWORD";
-
-// MQTT Broker
-const char* mqtt_server = "broker.hivemq.com";
-
-WiFiClient espClient;
-PubSubClient client(espClient);
 DHT dht(4, DHT22);
+
+// Use UART2 for VLC TX/RX (GPIO16/17 on many ESP32 boards)
+HardwareSerial vlc(2);
 
 void setup() {
   Serial.begin(115200);
-  setup_wifi();
-  client.setServer(mqtt_server, 1883);
+  vlc.begin(115200, SERIAL_8N1, 16, 17); // RX, TX
   dht.begin();
 }
 
 void loop() {
-  if (!client.connected()) {
-    reconnect();
-  }
-  client.loop();
-  
-  // Read sensors
   float temp = dht.readTemperature();
   float voltage = analogRead(34) * (3.3 / 4095.0);
-  
-  // Create JSON payload
-  String payload = "{\"temp\":" + String(temp) + 
-                   ",\"voltage\":" + String(voltage) + "}";
-  
-  // Publish to MQTT
-  client.publish("ev/telemetry/EV_001", payload.c_str());
-  
+
+  // Build JSON
+  StaticJsonDocument<128> doc;
+  doc["device_id"] = "EV_001";
+  doc["temp"] = temp;
+  doc["voltage"] = voltage;
+
+  // Serialize to VLC UART
+  serializeJson(doc, vlc);
+  vlc.println(); // newline as frame separator
+
   delay(5000); // Send every 5 seconds
 }
 ```
 
-**Full code available in**: `/firmware/esp32_sensor_mqtt/`
+**Gateway note**: The receiving gateway should read the VLC UART stream and publish the JSON line to the MQTT broker topic `ev/telemetry/EV_001`.
 
 ---
 
@@ -300,9 +301,10 @@ void loop() {
 
 1. **Voltage Levels**: Never exceed 3.3V on ESP32 GPIO pins
 2. **Current Protection**: Use appropriate fuses for battery
-3. **Heat Management**: Ensure proper ventilation for regulators
+3. **Heat Management**: Ensure proper ventilation for regulators and LED heatsink
 4. **Short Circuit**: Double-check all connections before power-on
 5. **Battery Handling**: Follow Li-ion battery safety guidelines
+6. **Eye Safety**: Do not stare into high-power LEDs; use diffusers or shielding during tests
 
 ---
 
@@ -310,7 +312,7 @@ void loop() {
 
 | Issue | Solution |
 |-------|----------|
-| ESP32 not connecting to WiFi | Check SSID/password, signal strength |
+| VLC link unstable | Improve LOS alignment, reduce ambient light, add RX shielding |
 | Sensor readings incorrect | Verify wiring, check voltage levels |
 | MQTT connection fails | Test broker connectivity, firewall settings |
 | GPS not getting fix | Move to open area, wait 2-3 minutes |
