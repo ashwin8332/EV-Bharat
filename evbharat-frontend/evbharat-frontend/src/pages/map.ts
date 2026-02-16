@@ -564,44 +564,6 @@ function setupLocationInputs() {
     }, 1000);
 }
 
-function createRouteMarkers(originPos: google.maps.LatLngLiteral, destPos: google.maps.LatLngLiteral) {
-    if (!googleMap) return;
-    
-    // Create origin marker
-    originMarker = new google.maps.Marker({
-        position: originPos,
-        map: googleMap,
-        title: 'Origin - Right-click for Street View',
-        icon: {
-            path: google.maps.SymbolPath.CIRCLE,
-            scale: 12,
-            fillColor: '#22c55e',
-            fillOpacity: 1,
-            strokeColor: '#000000',
-            strokeWeight: 3,
-        },
-    });
-    addLabel(originMarker, 'Origin');
-    addStreetViewToMarker(originMarker, originPos);
-    
-    // Create destination marker
-    destinationMarker = new google.maps.Marker({
-        position: destPos,
-        map: googleMap,
-        title: 'Destination - Right-click for Street View',
-        icon: {
-            path: google.maps.SymbolPath.CIRCLE,
-            scale: 12,
-            fillColor: '#ef4444',
-            fillOpacity: 1,
-            strokeColor: '#000000',
-            strokeWeight: 3,
-        },
-    });
-    addLabel(destinationMarker, 'Destination');
-    addStreetViewToMarker(destinationMarker, destPos);
-}
-
 function updateOriginMarker(position: google.maps.LatLng, name: string) {
     if (!googleMap) return;
     
