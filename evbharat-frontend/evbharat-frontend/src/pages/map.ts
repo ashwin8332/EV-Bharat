@@ -230,10 +230,6 @@ let destinationMarker: google.maps.Marker | null = null;
 let startAutocomplete: google.maps.places.Autocomplete | null = null;
 let endAutocomplete: google.maps.places.Autocomplete | null = null;
 
-// Coordinates
-const DELHI = { lat: 28.6139, lng: 77.2090 };
-const JAIPUR = { lat: 26.9124, lng: 75.7873 };
-
 const CHARGING_STATIONS = [
     { lat: 27.9878, lng: 76.3867, name: 'Tata Power EV Station', address: 'NH-48, Neemrana' },
     { lat: 27.8750, lng: 76.2795, name: 'EESL Charging Hub', address: 'Behror Service Area' },
@@ -350,8 +346,16 @@ function initGoogleMap() {
         // ── Initialize Street View Service ──
         streetViewService = new google.maps.StreetViewService();
 
-        // ── Create initial route markers ──
-        createRouteMarkers(DELHI, JAIPUR);
+        // ── Prepare directions renderer (used for user routes) ──
+        directionsRenderer = new google.maps.DirectionsRenderer({
+            map: googleMap,
+            suppressMarkers: true,
+            polylineOptions: {
+                strokeColor: '#22c55e',
+                strokeWeight: 5,
+                strokeOpacity: 0.9,
+            },
+        });
 
         // ── Charging station markers ──
         CHARGING_STATIONS.forEach((station, idx) => {
@@ -383,16 +387,6 @@ function initGoogleMap() {
             addStreetViewToMarker(marker, { lat: station.lat, lng: station.lng });
         });
 
-        // ── Draw route (Directions API) ──
-        drawRoute(DELHI, JAIPUR);
-
-        // ── Fit bounds ──
-        const bounds = new google.maps.LatLngBounds();
-        bounds.extend(DELHI);
-        bounds.extend(JAIPUR);
-        CHARGING_STATIONS.forEach(s => bounds.extend({ lat: s.lat, lng: s.lng }));
-        googleMap.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
-
         // Hide loading overlay
         const loading = document.getElementById('map-loading');
         if (loading) loading.style.display = 'none';
@@ -419,55 +413,6 @@ function addLabel(marker: google.maps.Marker, text: string) {
         };
     };
     overlay.setMap(googleMap);
-}
-
-function drawRoute(origin: google.maps.LatLngLiteral, destination: google.maps.LatLngLiteral) {
-    if (!googleMap) return;
-
-    // Always set up renderer
-    directionsRenderer = new google.maps.DirectionsRenderer({
-        map: googleMap,
-        suppressMarkers: true,
-        polylineOptions: {
-            strokeColor: '#22c55e',
-            strokeWeight: 5,
-            strokeOpacity: 0.9,
-        },
-    });
-
-    const service = new google.maps.DirectionsService();
-    service.route(
-        { origin, destination, travelMode: google.maps.TravelMode.DRIVING },
-        (result, status) => {
-            if (status === google.maps.DirectionsStatus.OK && result) {
-                directionsRenderer!.setDirections(result);
-                console.log('[EVBharat] Directions drawn');
-            } else {
-                console.warn('[EVBharat] Directions API failed:', status, '– drawing polyline fallback');
-                drawPolylineFallback();
-            }
-        },
-    );
-}
-
-/** Fallback: draw a simple polyline if Directions API is not enabled */
-function drawPolylineFallback() {
-    if (!googleMap) return;
-    const routeCoords = [
-        DELHI,
-        { lat: 28.45, lng: 77.03 },
-        { lat: 28.20, lng: 76.72 },
-        ...CHARGING_STATIONS.map(s => ({ lat: s.lat, lng: s.lng })),
-        JAIPUR,
-    ];
-    new google.maps.Polyline({
-        path: routeCoords,
-        geodesic: true,
-        strokeColor: '#22c55e',
-        strokeOpacity: 0.85,
-        strokeWeight: 4,
-        map: googleMap,
-    });
 }
 
 function initializeMapPage() {
@@ -537,7 +482,7 @@ function initializeMapPage() {
                             <span class="text-yellow-400"><i class="fa-solid fa-star mr-1"></i>${station.rating}</span>
                         </div>
                     </div>
-                    <button class="px-4 py-2 bg-pagani-gold/20 border border-pagani-gold/50 rounded-lg text-pagani-gold text-xs font-orbitron hover:bg-pagani-gold hover:text-black transition-all whitespace-nowrap">
+                    <button class="px-4 py-DELHI2 bg-pagani-gold/20 border border-pagani-gold/50 rounded-lg text-pagani-gold text-xs font-orbitron hover:bg-pagani-gold hover:text-black transition-all whitespace-nowrap">
                         Navigate
                     </button>
                 </div>
