@@ -145,6 +145,15 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+// ── Google Maps API key endpoint ──
+app.get('/api/maps/key', (_req, res) => {
+  const key = process.env.GOOGLE_MAPS_API_KEY;
+  if (!key) {
+    return res.status(500).json({ success: false, message: 'Maps API key not configured.' });
+  }
+  return res.json({ key });
+});
+
 app.use((err, _req, res, _next) => {
   console.error('Unhandled error:', err);
   res.status(500).json({ success: false, message: 'Server error.' });

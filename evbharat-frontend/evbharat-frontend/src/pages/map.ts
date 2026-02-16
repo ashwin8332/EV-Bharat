@@ -153,89 +153,13 @@ export async function renderMapPage() {
                         <!-- Map Container -->
                         <div class="bg-gradient-to-br from-gray-900 to-pagani-black border border-pagani-gold/20 rounded-xl overflow-hidden fade-in-section" style="animation-delay: 150ms">
                             <div class="relative h-[400px] lg:h-[450px] bg-gray-800">
-                                <!-- Simulated Map -->
-                                <div class="absolute inset-0 bg-gradient-to-br from-gray-800 via-gray-900 to-pagani-black">
-                                    <div class="absolute inset-0 opacity-30" style="background-image: url('data:image/svg+xml,%3Csvg width=\"60\" height=\"60\" viewBox=\"0 0 60 60\" xmlns=\"http://www.w3.org/2000/svg\"%3E%3Cg fill=\"none\" fill-rule=\"evenodd\"%3E%3Cg fill=\"%23d4af37\" fill-opacity=\"0.1\"%3E%3Cpath d=\"M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')"></div>
-                                    
-                                    <!-- Simulated Route Line -->
-                                    <svg class="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-                                        <path d="M 15,80 Q 30,60 45,50 T 75,25" fill="none" stroke="#d4af37" stroke-width="0.5" stroke-dasharray="2,1" class="animate-pulse"/>
-                                        <path d="M 15,80 Q 30,60 45,50 T 75,25" fill="none" stroke="#22c55e" stroke-width="0.8"/>
-                                    </svg>
-
-                                    <!-- Map Markers -->
-                                    <div class="absolute left-[12%] bottom-[15%] transform -translate-x-1/2">
-                                        <div class="relative">
-                                            <div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center shadow-lg animate-pulse">
-                                                <i class="fa-solid fa-car text-white text-sm"></i>
-                                            </div>
-                                            <div class="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-pagani-black px-2 py-1 rounded text-xs whitespace-nowrap">New Delhi</div>
-                                        </div>
-                                    </div>
-
-                                    <div class="absolute left-[45%] top-[45%] transform -translate-x-1/2 -translate-y-1/2">
-                                        <div class="relative">
-                                            <div class="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center shadow-lg">
-                                                <i class="fa-solid fa-charging-station text-white text-sm"></i>
-                                            </div>
-                                            <div class="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-pagani-black px-2 py-1 rounded text-xs whitespace-nowrap">Charging Stop</div>
-                                        </div>
-                                    </div>
-
-                                    <div class="absolute right-[20%] top-[20%]">
-                                        <div class="relative">
-                                            <div class="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center shadow-lg">
-                                                <i class="fa-solid fa-flag-checkered text-white text-sm"></i>
-                                            </div>
-                                            <div class="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-pagani-black px-2 py-1 rounded text-xs whitespace-nowrap">Jaipur</div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Additional charging stations markers -->
-                                    <div class="absolute left-[30%] top-[55%]">
-                                        <div class="w-5 h-5 bg-blue-500/80 rounded-full flex items-center justify-center cursor-pointer hover:scale-125 transition-transform">
-                                            <i class="fa-solid fa-plug text-white text-xs"></i>
-                                        </div>
-                                    </div>
-                                    <div class="absolute left-[55%] top-[35%]">
-                                        <div class="w-5 h-5 bg-blue-500/80 rounded-full flex items-center justify-center cursor-pointer hover:scale-125 transition-transform">
-                                            <i class="fa-solid fa-plug text-white text-xs"></i>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Map Controls -->
-                                <div class="absolute top-4 right-4 flex flex-col gap-2">
-                                    <button class="w-10 h-10 bg-pagani-black/80 border border-pagani-gold/30 rounded-lg flex items-center justify-center text-white hover:bg-pagani-gold hover:text-black transition-all">
-                                        <i class="fa-solid fa-plus"></i>
-                                    </button>
-                                    <button class="w-10 h-10 bg-pagani-black/80 border border-pagani-gold/30 rounded-lg flex items-center justify-center text-white hover:bg-pagani-gold hover:text-black transition-all">
-                                        <i class="fa-solid fa-minus"></i>
-                                    </button>
-                                    <button class="w-10 h-10 bg-pagani-black/80 border border-pagani-gold/30 rounded-lg flex items-center justify-center text-white hover:bg-pagani-gold hover:text-black transition-all">
-                                        <i class="fa-solid fa-location-crosshairs"></i>
-                                    </button>
-                                </div>
-
-                                <!-- Map Legend -->
-                                <div class="absolute bottom-4 left-4 bg-pagani-black/90 border border-pagani-gold/30 rounded-lg p-3">
-                                    <div class="flex flex-wrap gap-3 text-xs">
-                                        <div class="flex items-center gap-1">
-                                            <div class="w-3 h-3 bg-green-500 rounded-full"></div>
-                                            <span class="text-gray-400">Your Location</span>
-                                        </div>
-                                        <div class="flex items-center gap-1">
-                                            <div class="w-3 h-3 bg-red-500 rounded-full"></div>
-                                            <span class="text-gray-400">Destination</span>
-                                        </div>
-                                        <div class="flex items-center gap-1">
-                                            <div class="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                                            <span class="text-gray-400">Charging Stop</span>
-                                        </div>
-                                        <div class="flex items-center gap-1">
-                                            <div class="w-3 h-3 bg-blue-500 rounded-full"></div>
-                                            <span class="text-gray-400">Nearby Station</span>
-                                        </div>
+                                <!-- Real Google Map -->
+                                <div id="google-map" class="absolute inset-0"></div>
+                                <!-- Loading overlay (shown until map loads) -->
+                                <div id="map-loading" class="absolute inset-0 flex items-center justify-center bg-gray-900/80 z-10">
+                                    <div class="text-center">
+                                        <i class="fa-solid fa-spinner animate-spin text-pagani-gold text-3xl mb-3"></i>
+                                        <p class="text-gray-400 text-sm font-orbitron">Loading Map...</p>
                                     </div>
                                 </div>
                             </div>
@@ -250,12 +174,12 @@ export async function renderMapPage() {
                             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 <div class="text-center p-4 bg-pagani-black/50 rounded-lg border border-pagani-gold/10">
                                     <i class="fa-solid fa-road text-2xl text-pagani-gold mb-2"></i>
-                                    <p class="text-2xl font-orbitron font-bold">268</p>
+                                    <p class="text-2xl font-orbitron font-bold" data-trip="km">268</p>
                                     <p class="text-xs text-gray-400 mt-1">Kilometers</p>
                                 </div>
                                 <div class="text-center p-4 bg-pagani-black/50 rounded-lg border border-pagani-gold/10">
                                     <i class="fa-solid fa-clock text-2xl text-blue-400 mb-2"></i>
-                                    <p class="text-2xl font-orbitron font-bold">4h 15m</p>
+                                    <p class="text-2xl font-orbitron font-bold" data-trip="dur">4h 15m</p>
                                     <p class="text-xs text-gray-400 mt-1">Duration</p>
                                 </div>
                                 <div class="text-center p-4 bg-pagani-black/50 rounded-lg border border-pagani-gold/10">
@@ -293,10 +217,263 @@ export async function renderMapPage() {
     // Initialize map page functionality
     setTimeout(() => {
         initializeMapPage();
+        loadGoogleMap();
     }, 100);
 }
 
+// ── Google Maps loader ───────────────────────────────────────────────
+let googleMap: google.maps.Map | null = null;
+let directionsRenderer: google.maps.DirectionsRenderer | null = null;
+let streetViewService: google.maps.StreetViewService | null = null;
+let originMarker: google.maps.Marker | null = null;
+let destinationMarker: google.maps.Marker | null = null;
+let startAutocomplete: google.maps.places.Autocomplete | null = null;
+let endAutocomplete: google.maps.places.Autocomplete | null = null;
+
+// Coordinates
+const DELHI = { lat: 28.6139, lng: 77.2090 };
+const JAIPUR = { lat: 26.9124, lng: 75.7873 };
+
+const CHARGING_STATIONS = [
+    { lat: 27.9878, lng: 76.3867, name: 'Tata Power EV Station', address: 'NH-48, Neemrana' },
+    { lat: 27.8750, lng: 76.2795, name: 'EESL Charging Hub', address: 'Behror Service Area' },
+    { lat: 27.3990, lng: 75.9710, name: 'Fortum Charge Station', address: 'Shahpura, NH-48' },
+    { lat: 27.0505, lng: 75.8570, name: 'ChargeZone Ultra', address: 'Near Jaipur Toll' },
+    { lat: 26.9450, lng: 75.7625, name: 'Statiq Hypercharger', address: 'Jaipur Ring Road' },
+];
+
+// Light map style (minimal customization for cleaner look)
+const LIGHT_MAP_STYLES: google.maps.MapTypeStyle[] = [
+    // Hide some POI categories for cleaner view
+    { featureType: 'poi.business', stylers: [{ visibility: 'off' }] },
+    { featureType: 'poi.medical', stylers: [{ visibility: 'off' }] },
+    { featureType: 'poi.school', stylers: [{ visibility: 'off' }] },
+    // Enhance roads for better route visibility
+    { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#4285f4' }, { weight: 1 }] },
+    { featureType: 'road.arterial', elementType: 'geometry', stylers: [{ color: '#34a853' }] },
+];
+
+async function loadGoogleMap() {
+    const apiBase = import.meta.env.VITE_API_BASE_URL ?? '';
+
+    try {
+        // 1. Fetch API key from backend
+        const res = await fetch(`${apiBase}/api/maps/key`);
+        if (!res.ok) throw new Error(`Key endpoint returned ${res.status}`);
+        const data = await res.json();
+        if (!data.key) throw new Error('No key in response');
+        const apiKey = data.key;
+
+        // 2. Load Google Maps script (if not already loaded)
+        if (typeof google === 'undefined' || !google.maps) {
+            // Remove any previously injected script (avoids duplicate key errors)
+            document.querySelectorAll('script[src*="maps.googleapis.com"]').forEach(s => s.remove());
+
+            const callbackName = '__evbInitMap_' + Date.now();
+            await new Promise<void>((resolve, reject) => {
+                // Google Maps callback-based loading (most reliable)
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                (window as any)[callbackName] = () => {
+                    delete (window as any)[callbackName];
+                    resolve();
+                };
+
+                const script = document.createElement('script');
+                script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=${callbackName}`;
+                script.async = true;
+                script.onerror = () => {
+                    delete (window as any)[callbackName];
+                    reject(new Error('Google Maps script failed to load'));
+                };
+                document.head.appendChild(script);
+
+                // Safety timeout
+                setTimeout(() => reject(new Error('Google Maps load timed out')), 15000);
+            });
+        }
+
+        // 3. Initialize the map
+        initGoogleMap();
+    } catch (err) {
+        console.error('[EVBharat] Google Maps load error:', err);
+        showMapError(String(err));
+    }
+}
+
+function showMapError(detail: string) {
+    const loading = document.getElementById('map-loading');
+    if (loading) {
+        loading.innerHTML = `
+            <div class="text-center">
+                <i class="fa-solid fa-triangle-exclamation text-red-400 text-3xl mb-3"></i>
+                <p class="text-red-400 text-sm font-orbitron mb-1">Failed to load map</p>
+                <p class="text-gray-500 text-xs">${detail}</p>
+            </div>`;
+    }
+}
+
+function initGoogleMap() {
+    const container = document.getElementById('google-map');
+    if (!container) { console.error('[EVBharat] #google-map container not found'); return; }
+    if (typeof google === 'undefined') { console.error('[EVBharat] google is undefined'); return; }
+
+    try {
+        // ── Create map with full controls ──
+        googleMap = new google.maps.Map(container, {
+            center: { lat: 27.5, lng: 76.5 },
+            zoom: 7,
+            mapTypeId: google.maps.MapTypeId.ROADMAP,
+            styles: LIGHT_MAP_STYLES,
+            // Enable all standard UI controls
+            disableDefaultUI: false,
+            zoomControl: true,
+            zoomControlOptions: { position: google.maps.ControlPosition.RIGHT_TOP },
+            mapTypeControl: true,
+            mapTypeControlOptions: {
+                style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
+                position: google.maps.ControlPosition.TOP_CENTER,
+                mapTypeIds: [
+                    google.maps.MapTypeId.ROADMAP,
+                    google.maps.MapTypeId.SATELLITE,
+                    google.maps.MapTypeId.HYBRID,
+                    google.maps.MapTypeId.TERRAIN
+                ]
+            },
+            streetViewControl: true,
+            streetViewControlOptions: { position: google.maps.ControlPosition.RIGHT_TOP },
+            fullscreenControl: true,
+            fullscreenControlOptions: { position: google.maps.ControlPosition.RIGHT_TOP },
+            scaleControl: true,
+            gestureHandling: 'greedy',
+        });
+
+        // ── Initialize Street View Service ──
+        streetViewService = new google.maps.StreetViewService();
+
+        // ── Create initial route markers ──
+        createRouteMarkers(DELHI, JAIPUR);
+
+        // ── Charging station markers ──
+        CHARGING_STATIONS.forEach((station, idx) => {
+            const marker = new google.maps.Marker({
+                position: { lat: station.lat, lng: station.lng },
+                map: googleMap!,
+                title: `${station.name} - Right-click for Street View`,
+                icon: {
+                    path: google.maps.SymbolPath.CIRCLE,
+                    scale: idx === 0 ? 10 : 8,
+                    fillColor: idx === 0 ? '#eab308' : '#3b82f6',
+                    fillOpacity: 0.95,
+                    strokeColor: '#000000',
+                    strokeWeight: 2,
+                },
+            });
+
+            const infoContent = `
+                <div style="color:#000;font-family:sans-serif;padding:4px 0">
+                    <strong style="font-size:14px">${station.name}</strong><br>
+                    <span style="color:#555;font-size:12px">${station.address}</span>
+                    ${idx === 0 ? '<br><span style="background:#eab308;color:#000;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:bold;margin-top:4px;display:inline-block">RECOMMENDED STOP</span>' : ''}
+                    <br><small style="color:#888;font-size:10px">Right-click for Street View</small>
+                </div>`;
+            const iw = new google.maps.InfoWindow({ content: infoContent });
+            marker.addListener('click', () => iw.open(googleMap!, marker));
+            
+            // Add Street View functionality to charging station markers
+            addStreetViewToMarker(marker, { lat: station.lat, lng: station.lng });
+        });
+
+        // ── Draw route (Directions API) ──
+        drawRoute(DELHI, JAIPUR);
+
+        // ── Fit bounds ──
+        const bounds = new google.maps.LatLngBounds();
+        bounds.extend(DELHI);
+        bounds.extend(JAIPUR);
+        CHARGING_STATIONS.forEach(s => bounds.extend({ lat: s.lat, lng: s.lng }));
+        googleMap.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
+
+        // Hide loading overlay
+        const loading = document.getElementById('map-loading');
+        if (loading) loading.style.display = 'none';
+
+        console.log('[EVBharat] Google Map initialized successfully');
+    } catch (err) {
+        console.error('[EVBharat] initGoogleMap error:', err);
+        showMapError(String(err));
+    }
+}
+
+function addLabel(marker: google.maps.Marker, text: string) {
+    if (!googleMap) return;
+    const overlay = new google.maps.OverlayView();
+    overlay.onAdd = function () {
+        const div = document.createElement('div');
+        div.style.cssText = 'position:absolute;background:#ffffff;color:#1565c0;padding:2px 8px;border-radius:4px;font-size:11px;font-family:Orbitron,sans-serif;white-space:nowrap;border:1px solid rgba(21,101,192,0.3);pointer-events:none;transform:translate(-50%,8px);box-shadow:0 2px 4px rgba(0,0,0,0.1)';
+        div.textContent = text;
+        const panes = this.getPanes();
+        panes?.overlayLayer.appendChild(div);
+        overlay.draw = function () {
+            const pos = this.getProjection().fromLatLngToDivPixel(marker.getPosition()!);
+            if (pos) { div.style.left = pos.x + 'px'; div.style.top = pos.y + 'px'; }
+        };
+    };
+    overlay.setMap(googleMap);
+}
+
+function drawRoute(origin: google.maps.LatLngLiteral, destination: google.maps.LatLngLiteral) {
+    if (!googleMap) return;
+
+    // Always set up renderer
+    directionsRenderer = new google.maps.DirectionsRenderer({
+        map: googleMap,
+        suppressMarkers: true,
+        polylineOptions: {
+            strokeColor: '#22c55e',
+            strokeWeight: 5,
+            strokeOpacity: 0.9,
+        },
+    });
+
+    const service = new google.maps.DirectionsService();
+    service.route(
+        { origin, destination, travelMode: google.maps.TravelMode.DRIVING },
+        (result, status) => {
+            if (status === google.maps.DirectionsStatus.OK && result) {
+                directionsRenderer!.setDirections(result);
+                console.log('[EVBharat] Directions drawn');
+            } else {
+                console.warn('[EVBharat] Directions API failed:', status, '– drawing polyline fallback');
+                drawPolylineFallback();
+            }
+        },
+    );
+}
+
+/** Fallback: draw a simple polyline if Directions API is not enabled */
+function drawPolylineFallback() {
+    if (!googleMap) return;
+    const routeCoords = [
+        DELHI,
+        { lat: 28.45, lng: 77.03 },
+        { lat: 28.20, lng: 76.72 },
+        ...CHARGING_STATIONS.map(s => ({ lat: s.lat, lng: s.lng })),
+        JAIPUR,
+    ];
+    new google.maps.Polyline({
+        path: routeCoords,
+        geodesic: true,
+        strokeColor: '#22c55e',
+        strokeOpacity: 0.85,
+        strokeWeight: 4,
+        map: googleMap,
+    });
+}
+
 function initializeMapPage() {
+    // Setup location autocomplete
+    setupLocationInputs();
+    
     // Populate route options
     const routeOptions = document.getElementById('route-options');
     if (routeOptions) {
@@ -368,18 +545,14 @@ function initializeMapPage() {
         `).join('');
     }
 
-    // Calculate route button
+    // Calculate route button – enhanced with geocoding
     const calculateBtn = document.getElementById('calculate-route-btn');
     calculateBtn?.addEventListener('click', () => {
-        calculateBtn.innerHTML = '<i class="fa-solid fa-spinner animate-spin mr-2"></i> Calculating...';
-        setTimeout(() => {
-            calculateBtn.innerHTML = '<i class="fa-solid fa-check mr-2"></i> Route Calculated!';
-            showNotification('Optimal route calculated based on battery and traffic', 'success');
-            setTimeout(() => {
-                calculateBtn.innerHTML = '<i class="fa-solid fa-magnifying-glass-location mr-2"></i> Calculate Route';
-            }, 2000);
-        }, 1500);
+        calculateDynamicRoute();
     });
+
+    // Add current location button
+    addCurrentLocationButton();
 
     // Route option selection
     const routeOptionElements = document.querySelectorAll('.route-option');
@@ -405,4 +578,352 @@ function showNotification(message: string, type: 'success' | 'error') {
     notification.innerHTML = `<i class="fa-solid ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'} mr-2"></i>${message}`;
     document.body.appendChild(notification);
     setTimeout(() => notification.remove(), 3000);
+}
+
+// ── Dynamic Location & Route Functions ────────────────────────────────
+
+function setupLocationInputs() {
+    // Wait for Google Maps to be loaded
+    setTimeout(() => {
+        if (typeof google === 'undefined' || !google.maps.places) return;
+        
+        const startInput = document.getElementById('start-location') as HTMLInputElement;
+        const endInput = document.getElementById('end-location') as HTMLInputElement;
+        
+        if (startInput && endInput) {
+            // Setup autocomplete with Indian bias
+            const autocompleteOptions = {
+                componentRestrictions: { country: 'IN' },
+                fields: ['place_id', 'geometry', 'name', 'formatted_address'],
+                types: ['(cities)']
+            };
+            
+            startAutocomplete = new google.maps.places.Autocomplete(startInput, autocompleteOptions);
+            endAutocomplete = new google.maps.places.Autocomplete(endInput, autocompleteOptions);
+            
+            // Add listeners for place selection
+            startAutocomplete.addListener('place_changed', () => {
+                const place = startAutocomplete!.getPlace();
+                if (place.geometry?.location) {
+                    updateOriginMarker(place.geometry.location, place.name || place.formatted_address || 'Origin');
+                }
+            });
+            
+            endAutocomplete.addListener('place_changed', () => {
+                const place = endAutocomplete!.getPlace();
+                if (place.geometry?.location) {
+                    updateDestinationMarker(place.geometry.location, place.name || place.formatted_address || 'Destination');
+                }
+            });
+        }
+    }, 1000);
+}
+
+function createRouteMarkers(originPos: google.maps.LatLngLiteral, destPos: google.maps.LatLngLiteral) {
+    if (!googleMap) return;
+    
+    // Create origin marker
+    originMarker = new google.maps.Marker({
+        position: originPos,
+        map: googleMap,
+        title: 'Origin - Right-click for Street View',
+        icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 12,
+            fillColor: '#22c55e',
+            fillOpacity: 1,
+            strokeColor: '#000000',
+            strokeWeight: 3,
+        },
+    });
+    addLabel(originMarker, 'Origin');
+    addStreetViewToMarker(originMarker, originPos);
+    
+    // Create destination marker
+    destinationMarker = new google.maps.Marker({
+        position: destPos,
+        map: googleMap,
+        title: 'Destination - Right-click for Street View',
+        icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 12,
+            fillColor: '#ef4444',
+            fillOpacity: 1,
+            strokeColor: '#000000',
+            strokeWeight: 3,
+        },
+    });
+    addLabel(destinationMarker, 'Destination');
+    addStreetViewToMarker(destinationMarker, destPos);
+}
+
+function updateOriginMarker(position: google.maps.LatLng, name: string) {
+    if (!googleMap) return;
+    
+    const pos = { lat: position.lat(), lng: position.lng() };
+    
+    if (originMarker) {
+        originMarker.setPosition(pos);
+        originMarker.setTitle(`${name} - Right-click for Street View`);
+    } else {
+        originMarker = new google.maps.Marker({
+            position: pos,
+            map: googleMap,
+            title: `${name} - Right-click for Street View`,
+            icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 12,
+                fillColor: '#22c55e',
+                fillOpacity: 1,
+                strokeColor: '#000000',
+                strokeWeight: 3,
+            },
+        });
+        addStreetViewToMarker(originMarker, pos);
+    }
+    
+    addLabel(originMarker, name);
+}
+
+function updateDestinationMarker(position: google.maps.LatLng, name: string) {
+    if (!googleMap) return;
+    
+    const pos = { lat: position.lat(), lng: position.lng() };
+    
+    if (destinationMarker) {
+        destinationMarker.setPosition(pos);
+        destinationMarker.setTitle(`${name} - Right-click for Street View`);
+    } else {
+        destinationMarker = new google.maps.Marker({
+            position: pos,
+            map: googleMap,
+            title: `${name} - Right-click for Street View`,
+            icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 12,
+                fillColor: '#ef4444',
+                fillOpacity: 1,
+                strokeColor: '#000000',
+                strokeWeight: 3,
+            },
+        });
+        addStreetViewToMarker(destinationMarker, pos);
+    }
+    
+    addLabel(destinationMarker, name);
+}
+
+function calculateDynamicRoute() {
+    const calculateBtn = document.getElementById('calculate-route-btn');
+    const startInput = document.getElementById('start-location') as HTMLInputElement;
+    const endInput = document.getElementById('end-location') as HTMLInputElement;
+    
+    if (!calculateBtn || !startInput || !endInput) return;
+    
+    const origin = startInput.value.trim();
+    const destination = endInput.value.trim();
+    
+    if (!origin || !destination) {
+        showNotification('Please enter both origin and destination', 'error');
+        return;
+    }
+    
+    calculateBtn.innerHTML = '<i class="fa-solid fa-spinner animate-spin mr-2"></i> Calculating...';
+    
+    if (typeof google !== 'undefined' && googleMap && directionsRenderer) {
+        const directionsService = new google.maps.DirectionsService();
+        const geocoder = new google.maps.Geocoder();
+        
+        // Geocode both locations first for better accuracy
+        Promise.all([
+            geocodeLocation(geocoder, origin),
+            geocodeLocation(geocoder, destination)
+        ]).then(([originResult, destResult]) => {
+            if (originResult && destResult) {
+                // Update markers with geocoded positions
+                updateOriginMarker(originResult.geometry.location, originResult.formatted_address);
+                updateDestinationMarker(destResult.geometry.location, destResult.formatted_address);
+                
+                // Calculate route using geocoded positions
+                directionsService.route({
+                    origin: originResult.geometry.location,
+                    destination: destResult.geometry.location,
+                    travelMode: google.maps.TravelMode.DRIVING,
+                    unitSystem: google.maps.UnitSystem.METRIC,
+                }, (result, status) => {
+                    if (status === google.maps.DirectionsStatus.OK && result) {
+                        directionsRenderer!.setDirections(result);
+                        
+                        // Update trip analysis
+                        const leg = result.routes[0]?.legs[0];
+                        if (leg) {
+                            const kmEl = document.querySelector('[data-trip="km"]');
+                            const durEl = document.querySelector('[data-trip="dur"]');
+                            if (kmEl) kmEl.textContent = String(Math.round((leg.distance?.value ?? 0) / 1000));
+                            if (durEl) durEl.textContent = leg.duration?.text ?? '';
+                        }
+                        
+                        // Fit map to route
+                        const bounds = new google.maps.LatLngBounds();
+                        bounds.extend(originResult.geometry.location);
+                        bounds.extend(destResult.geometry.location);
+                        googleMap!.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
+                        
+                        calculateBtn.innerHTML = '<i class="fa-solid fa-check mr-2"></i> Route Calculated!';
+                        showNotification(`Route from ${originResult.address_components?.[0]?.long_name} to ${destResult.address_components?.[0]?.long_name} calculated`, 'success');
+                    } else {
+                        handleRouteError(status);
+                    }
+                    
+                    setTimeout(() => {
+                        calculateBtn.innerHTML = '<i class="fa-solid fa-magnifying-glass-location mr-2"></i> Calculate Route';
+                    }, 3000);
+                });
+            } else {
+                calculateBtn.innerHTML = '<i class="fa-solid fa-exclamation-triangle mr-2"></i> Invalid Locations';
+                showNotification('Could not find one or both locations. Please check spelling.', 'error');
+                setTimeout(() => {
+                    calculateBtn.innerHTML = '<i class="fa-solid fa-magnifying-glass-location mr-2"></i> Calculate Route';
+                }, 3000);
+            }
+        });
+    } else {
+        // Fallback for when Maps API isn't loaded
+        setTimeout(() => {
+            calculateBtn.innerHTML = '<i class="fa-solid fa-check mr-2"></i> Route Calculated!';
+            showNotification('Route calculated with fallback method', 'success');
+            setTimeout(() => {
+                calculateBtn.innerHTML = '<i class="fa-solid fa-magnifying-glass-location mr-2"></i> Calculate Route';
+            }, 2000);
+        }, 1500);
+    }
+}
+
+function geocodeLocation(geocoder: google.maps.Geocoder, address: string): Promise<google.maps.GeocoderResult | null> {
+    return new Promise((resolve) => {
+        geocoder.geocode({
+            address: address,
+            componentRestrictions: { country: 'IN' }
+        }, (results, status) => {
+            if (status === google.maps.GeocoderStatus.OK && results?.[0]) {
+                resolve(results[0]);
+            } else {
+                resolve(null);
+            }
+        });
+    });
+}
+
+function handleRouteError(status: google.maps.DirectionsStatus) {
+    const calculateBtn = document.getElementById('calculate-route-btn');
+    if (!calculateBtn) return;
+    
+    let message = 'Could not calculate route';
+    switch (status) {
+        case google.maps.DirectionsStatus.NOT_FOUND:
+            message = 'One or both locations not found';
+            break;
+        case google.maps.DirectionsStatus.ZERO_RESULTS:
+            message = 'No route found between these locations';
+            break;
+        case google.maps.DirectionsStatus.OVER_QUERY_LIMIT:
+            message = 'Too many requests. Please try again later.';
+            break;
+        case google.maps.DirectionsStatus.REQUEST_DENIED:
+            message = 'Directions request denied';
+            break;
+    }
+    
+    calculateBtn.innerHTML = '<i class="fa-solid fa-exclamation-triangle mr-2"></i> Route Failed';
+    showNotification(message, 'error');
+}
+
+function addCurrentLocationButton() {
+    // Add current location button to start input
+    const startInput = document.getElementById('start-location');
+    if (startInput && !document.getElementById('current-location-btn')) {
+        const container = startInput.parentElement;
+        if (container) {
+            const button = document.createElement('button');
+            button.id = 'current-location-btn';
+            button.type = 'button';
+            button.className = 'absolute right-3 top-1/2 -translate-y-1/2 text-pagani-gold hover:text-bright-gold transition-colors';
+            button.innerHTML = '<i class="fa-solid fa-location-crosshairs text-sm"></i>';
+            button.title = 'Use current location';
+            
+            button.addEventListener('click', () => {
+                if ('geolocation' in navigator) {
+                    button.innerHTML = '<i class="fa-solid fa-spinner animate-spin text-sm"></i>';
+                    
+                    navigator.geolocation.getCurrentPosition((position) => {
+                        const lat = position.coords.latitude;
+                        const lng = position.coords.longitude;
+                        
+                        if (typeof google !== 'undefined') {
+                            const geocoder = new google.maps.Geocoder();
+                            geocoder.geocode({
+                                location: { lat, lng }
+                            }, (results, status) => {
+                                button.innerHTML = '<i class="fa-solid fa-location-crosshairs text-sm"></i>';
+                                
+                                if (status === google.maps.GeocoderStatus.OK && results?.[0]) {
+                                    (startInput as HTMLInputElement).value = results[0].formatted_address;
+                                    updateOriginMarker(new google.maps.LatLng(lat, lng), 'Current Location');
+                                    showNotification('Current location detected', 'success');
+                                } else {
+                                    showNotification('Could not determine address from location', 'error');
+                                }
+                            });
+                        }
+                    }, (_error) => {
+                        button.innerHTML = '<i class="fa-solid fa-location-crosshairs text-sm"></i>';
+                        showNotification('Location access denied or unavailable', 'error');
+                    });
+                } else {
+                    showNotification('Geolocation not supported by this browser', 'error');
+                }
+            });
+            
+            container.appendChild(button);
+        }
+    }
+}
+
+// ── Street View Functions ────────────────────────────────────────────
+
+function addStreetViewToMarker(marker: google.maps.Marker, _position: google.maps.LatLngLiteral) {
+    // Right-click opens Street View at the marker's CURRENT position
+    marker.addListener('rightclick', () => {
+        const pos = marker.getPosition();
+        if (!pos) return;
+        openStreetViewAt({ lat: pos.lat(), lng: pos.lng() });
+    });
+
+    // Double-click also opens Street View
+    marker.addListener('dblclick', () => {
+        const pos = marker.getPosition();
+        if (!pos) return;
+        openStreetViewAt({ lat: pos.lat(), lng: pos.lng() });
+    });
+}
+
+function openStreetViewAt(position: google.maps.LatLngLiteral) {
+    if (!streetViewService || !googleMap) return;
+
+    // Check if Street View imagery exists near this position
+    streetViewService.getPanorama(
+        { location: position, radius: 1000, source: google.maps.StreetViewSource.DEFAULT },
+        (data, status) => {
+            if (status === google.maps.StreetViewStatus.OK && data?.location?.latLng) {
+                // Found coverage — open the built-in Street View panorama
+                const pano = googleMap!.getStreetView();
+                pano.setPosition(data.location.latLng);
+                pano.setPov({ heading: 0, pitch: 0 });
+                pano.setVisible(true);
+                showNotification('Street View opened. Click the X or press Esc to return.', 'success');
+            } else {
+                showNotification('No Street View coverage at this location.', 'error');
+            }
+        },
+    );
 }
