@@ -39,6 +39,9 @@ export async function renderBatteryPage() {
                         <p class="text-gray-400">AI-Powered Battery Health Monitoring & Prediction</p>
                     </div>
                     <div class="flex items-center gap-3">
+                        <a href="/battery-analytics" class="px-4 py-2 bg-gradient-to-r from-pagani-gold to-yellow-500 text-black font-orbitron font-bold rounded-lg hover:shadow-lg hover:shadow-pagani-gold/20 transition-all text-sm">
+                            <i class="fa-solid fa-brain mr-2"></i>ML ANALYTICS
+                        </a>
                         <select id="vehicle-selector" class="px-4 py-2 bg-gray-800/50 border border-pagani-gold/30 rounded-lg text-white font-orbitron text-sm focus:outline-none focus:border-pagani-gold">
                             <option value="1">EVBharat X-1 (DL-01-AB-1234)</option>
                             <option value="2">EVBharat X-1 (MH-02-CD-5678)</option>
