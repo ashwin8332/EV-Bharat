@@ -437,24 +437,6 @@ export async function renderAuthPage() {
             </div>
         </div>
         
-        <!-- Demo Credentials Card -->
-        <div class="fixed bottom-8 left-1/2 -translate-x-1/2 w-full max-w-lg px-4 z-50">
-            <div class="p-4 bg-pagani-black/90 backdrop-blur-lg border border-pagani-gold/30 rounded-xl shadow-2xl">
-                <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div class="text-center sm:text-left">
-                        <p class="text-xs text-pagani-gold uppercase tracking-wider font-orbitron mb-1">Demo Credentials</p>
-                        <div class="flex flex-wrap gap-3 text-xs">
-                            <span class="text-gray-400">Email: <code class="text-pagani-gold">user@evbharat.com</code></span>
-                            <span class="text-gray-400">Pass: <code class="text-pagani-gold">Evbharat@123</code></span>
-                        </div>
-                    </div>
-                    <button id="useDemoBtn" class="px-4 py-2 bg-pagani-gold/20 hover:bg-pagani-gold hover:text-black border border-pagani-gold/50 rounded-lg text-pagani-gold text-xs font-orbitron uppercase transition-all whitespace-nowrap">
-                        <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Use Demo
-                    </button>
-                </div>
-            </div>
-        </div>
-        
         <!-- Back to Home -->
         <a href="/" class="fixed top-24 left-4 md:left-8 text-sm text-gray-400 hover:text-pagani-gold transition-colors z-50">
             <i class="fa-solid fa-arrow-left mr-1"></i> Back to Home
