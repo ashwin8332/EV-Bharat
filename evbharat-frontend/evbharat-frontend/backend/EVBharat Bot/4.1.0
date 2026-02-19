@@ -1,0 +1,2 @@
+Requirement already satisfied: redis in c:\users\hp\appdata\local\programs\python\python311\lib\site-packages (7.2.0)
+Requirement already satisfied: async-timeout>=4.0.3 in c:\users\hp\appdata\local\programs\python\python311\lib\site-packages (from redis) (5.0.1)
