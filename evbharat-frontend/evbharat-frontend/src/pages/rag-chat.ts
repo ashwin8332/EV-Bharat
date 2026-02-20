@@ -373,7 +373,14 @@ export async function renderRAGChatPage() {
     // ── Upload ────────────────────────────────────────────────────────────
     async function handleUpload(file: File) {
         if (uploading) return;
-        if (!file.name.toLowerCase().endsWith('.pdf')) { uploadStatus('Only PDF files accepted.', 'error'); return; }
+        const fname = file.name.toLowerCase();
+        const isPdf = fname.endsWith('.pdf');
+        const isImage = fname.match(/\.(jpg|jpeg|png|webp|gif|bmp)$/i);
+        
+        if (!(isPdf || isImage)) { 
+            uploadStatus('Only PDF or image files (JPG, PNG, WebP, GIF, BMP) accepted.', 'error'); 
+            return; 
+        }
         if (file.size > 50 * 1024 * 1024) { uploadStatus('File too large (max 50 MB).', 'error'); return; }
 
         uploading = true;
@@ -386,14 +393,15 @@ export async function renderRAGChatPage() {
             uploadName = file.name;
             mode = 'document';
             uploadProgress(100);
+            const typeStr = isPdf ? 'PDF' : 'Image';
             uploadStatus(`${file.name} — ${res.document_count} chunks`, 'success');
             updateMode();
             try {
                 const st = await api.sessionStatus(res.session_id);
                 if (st.exists && st.document_count) showDocStats(st);
             } catch { /* */ }
-            addMsg('system', `Document loaded: ${file.name}. Switched to document mode.`, false);
-            addMsg('assistant', `I've processed **${file.name}** and extracted **${res.document_count}** content chunks.\n\nYou can now ask questions about this document. I'll cross-reference with Indian EV regulations.\n\n**File hash:** \`${res.file_hash.slice(0, 12)}…\``);
+            addMsg('system', `${typeStr} loaded: ${file.name}. Switched to document mode.`, false);
+            addMsg('assistant', `I've processed **${file.name}** (${typeStr}) and extracted **${res.document_count}** content chunks.\n\nYou can now ask questions about this ${isPdf ? 'document' : 'image'}. I'll cross-reference with Indian EV regulations.\n\n**File hash:** \`${res.file_hash.slice(0, 12)}…\``);
         } catch (err) {
             uploadProgress(0);
             uploadStatus(`Upload failed: ${(err as Error).message}`, 'error');
@@ -532,10 +540,10 @@ export async function renderRAGChatPage() {
                     <div style="background:linear-gradient(135deg, rgba(17,24,39,.7), rgba(31,41,55,.5));border:1px solid rgba(75,85,99,.3);border-radius:12px;padding:14px;backdrop-filter:blur(8px);box-shadow:0 2px 8px rgba(0,0,0,.1)">
                         <h4 style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:#9ca3af;margin-bottom:10px;display:flex;align-items:center;gap:6px"><i class="fa-solid fa-paperclip" style="color:#D4AF37;font-size:12px"></i>Document Analysis</h4>
                         <div id="ev-upload-area" style="position:relative;border:2px dashed rgba(212,175,55,.25);border-radius:12px;padding:20px 16px;text-align:center;cursor:pointer;transition:all .3s cubic-bezier(0.4, 0, 0.2, 1);overflow:hidden;background:linear-gradient(135deg, rgba(212,175,55,.03), rgba(17,24,39,.3))">
-                            <input type="file" id="ev-file-input" accept=".pdf" style="display:none">
+                            <input type="file" id="ev-file-input" accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.bmp" style="display:none">
                             <i class="fa-solid fa-cloud-arrow-up" style="font-size:28px;color:#64748b;margin-bottom:8px;display:block;transition:all .3s"></i>
-                            <p style="font-size:12px;color:#9ca3af;font-weight:500">Drop PDF or <span style="color:#D4AF37;text-decoration:underline;cursor:pointer;font-weight:600">browse</span></p>
-                            <p style="font-size:10px;color:#64748b;margin-top:4px">Max 50 MB</p>
+                            <p style="font-size:12px;color:#9ca3af;font-weight:500">Drop PDF or image or <span style="color:#D4AF37;text-decoration:underline;cursor:pointer;font-weight:600">browse</span></p>
+                            <p style="font-size:10px;color:#64748b;margin-top:4px">JPG • PNG • WebP • GIF • BMP | Max 50 MB</p>
                             <div id="ev-upload-bar" style="position:absolute;bottom:0;left:0;height:3px;background:linear-gradient(90deg,#D4AF37,#FFD700);transition:width .8s cubic-bezier(0.4, 0, 0.2, 1);opacity:0;width:0;border-radius:0 0 12px 12px"></div>
                         </div>
                         <div id="ev-upload-status" style="margin-top:8px"></div>
@@ -609,12 +617,14 @@ export async function renderRAGChatPage() {
                                 >
                                 <button
                                     id="ev-send"
-                                    style="padding:12px 20px;background:linear-gradient(135deg, #D4AF37, #FFD700);border:none;border-radius:16px;color:#000;cursor:pointer;transition:all .3s;font-size:14px;font-weight:600;box-shadow:0 4px 12px rgba(212,175,55,.25)"
+                                    style="padding:12px 20px;background:linear-gradient(135deg, #D4AF37, #FFD700);border:none;border-radius:16px;color:#000;cursor:pointer;transition:all .3s;font-size:14px;font-weight:600;box-shadow:0 4px 12px rgba(212,175,55,.25);display:flex;align-items:center;gap:8px"
                                     title="🚀 Send message"
                                     onmouseenter="this.style.transform='translateY(-1px)';this.style.boxShadow='0 6px 20px rgba(212,175,55,.35)'"
                                     onmouseleave="this.style.transform='';this.style.boxShadow='0 4px 12px rgba(212,175,55,.25)'"
                                 >
-                                    <i class="fa-solid fa-paper-plane"></i>
+                                    <i class="fa-solid fa-paper-plane" style="font-size:14px"></i>
+                                    <span style="font-weight:700">Send</span>
+                                    <i class="fa-solid fa-rocket" style="font-size:12px"></i>
                                 </button>
                             </div>
                             <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding:0 4px">

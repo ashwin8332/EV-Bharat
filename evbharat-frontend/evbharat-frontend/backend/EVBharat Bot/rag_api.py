@@ -182,15 +182,20 @@ async def free_chat(request: FreeChatRequest):
         raise HTTPException(status_code=500, detail=str(exc))
 
 
-# ── PDF upload ───────────────────────────────────────────────────────────────
+# ── File upload (PDF & Images) ────────────────────────────────────────────────
 @app.post("/upload", response_model=UploadResponse)
-async def upload_pdf(file: UploadFile = File(...)):
-    """Upload a PDF, extract content, build a RAG retriever for it."""
+async def upload_document(file: UploadFile = File(...)):
+    """Upload a PDF or image, extract content, build a RAG retriever for it."""
     # Validation
     if not file.filename:
         raise HTTPException(status_code=400, detail="Filename is required.")
-    if not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Only PDF files (.pdf) are accepted.")
+    
+    filename_lower = file.filename.lower()
+    is_pdf = filename_lower.endswith(".pdf")
+    is_image = filename_lower.endswith((".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"))
+    
+    if not (is_pdf or is_image):
+        raise HTTPException(status_code=400, detail="Only PDF (.pdf) and image (.jpg, .png, .webp, .gif, .bmp) files are accepted.")
     
     # Check file size (max 50 MB)
     file.file.seek(0, 2)
@@ -207,7 +212,8 @@ async def upload_pdf(file: UploadFile = File(...)):
     file_path = DATA_DIR / f"{session_id}_{file.filename}"
 
     try:
-        logger.info(f"📥 Uploading file: {file.filename} ({file_size / 1024:.1f} KB)")
+        file_type = "PDF" if is_pdf else "Image"
+        logger.info(f"📥 Uploading {file_type}: {file.filename} ({file_size / 1024:.1f} KB)")
         
         # Save file
         with open(file_path, "wb") as buf:
@@ -220,17 +226,20 @@ async def upload_pdf(file: UploadFile = File(...)):
         file_hash = hashlib.sha256(file_path.read_bytes()).hexdigest()
         logger.info(f"✅ File saved: {file_path.name} (hash: {file_hash[:8]}...)")
 
-        # Process PDF
-        retriever = _process_pdf(str(file_path), session_id)
+        # Process based on type
+        if is_pdf:
+            retriever = _process_pdf(str(file_path), session_id)
+        else:
+            retriever = _process_image(str(file_path), session_id)
         
         if not retriever or len(retriever.documents) == 0:
-            raise Exception("PDF contains no extractable content")
+            raise Exception(f"{file_type} contains no extractable content")
 
-        logger.info(f"✅ PDF processed: {len(retriever.documents)} documents in session {session_id}")
+        logger.info(f"✅ {file_type} processed: {len(retriever.documents)} documents in session {session_id}")
         
         return UploadResponse(
             success=True,
-            message=f"Document processed successfully. Extracted {len(retriever.documents)} chunks.",
+            message=f"{file_type} processed successfully. Extracted {len(retriever.documents)} chunks.",
             session_id=session_id,
             file_hash=file_hash,
             document_count=len(retriever.documents),
@@ -246,7 +255,7 @@ async def upload_pdf(file: UploadFile = File(...)):
                 logger.info(f"🧹 Cleaned up failed upload: {file_path}")
             except:
                 pass
-        raise HTTPException(status_code=500, detail=f"PDF processing failed: {str(exc)}")
+        raise HTTPException(status_code=500, detail=f"File processing failed: {str(exc)}")
 
 
 # ── RAG chat (PDF-based) ────────────────────────────────────────────────────
@@ -387,6 +396,114 @@ def _summarise(text: List[str], tables: List[str]):
         chain.batch(text, {"max_concurrency": 5}) if text else [],
         chain.batch(tables, {"max_concurrency": 5}) if tables else [],
     )
+
+
+def _process_image(file_path: str, session_id: str) -> SimpleInMemoryRetriever:
+    """Extract content from an image using Claude vision."""
+    from PIL import Image
+    import base64
+    
+    # Verify file exists
+    if not Path(file_path).exists():
+        raise FileNotFoundError(f"Image file not found: {file_path}")
+    
+    file_size = Path(file_path).stat().st_size
+    logger.info(f"🖼️  Processing image: {Path(file_path).name} ({file_size / 1024:.1f} KB)")
+
+    try:
+        # Verify it's a valid image
+        logger.info("🔍 Validating image...")
+        img = Image.open(file_path)
+        img_size = img.size
+        logger.info(f"✅ Image validated: {img_size[0]}x{img_size[1]} pixels")
+        
+        # Use LLM for image analysis
+        logger.info("📝 Analyzing image with vision model...")
+        model = _get_llm()
+        
+        # Encode image to base64
+        with open(file_path, "rb") as f:
+            image_data = base64.b64encode(f.read()).decode("utf-8")
+        
+        # Get image format
+        img_format = img.format.lower() if img.format else "jpeg"
+        mime_type = f"image/{img_format}"
+        
+        # Get vision model that supports images
+        from langchain_core.messages import HumanMessage
+        
+        vision_msg = [
+            HumanMessage(
+                content=[
+                    {"type": "text", "text": "Please analyze this image related to electric vehicles. Describe what you see, any text, charts, or important information about EVs, batteries, charging, or Indian EV regulations. Be detailed and structured."},
+                    {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{image_data}"}}
+                ]
+            )
+        ]
+        
+        try:
+            response = model.invoke(vision_msg)
+            analysis = response.content
+        except Exception as exc:
+            logger.warning(f"⚠️  Vision analysis failed ({exc}); using filename as fallback")
+            analysis = f"Image file: {Path(file_path).name}\nImage size: {img_size[0]}x{img_size[1]} pixels"
+        
+        if not analysis or not analysis.strip():
+            raise ValueError("Image analysis produced no content")
+        
+        logger.info(f"✅ Image analyzed: {len(analysis)} characters")
+        
+        # Split into chunks
+        chunk_size = 2000
+        chunks = []
+        words = analysis.split()
+        current_chunk = []
+        current_size = 0
+        
+        for word in words:
+            current_chunk.append(word)
+            current_size += len(word) + 1
+            if current_size >= chunk_size:
+                chunks.append(' '.join(current_chunk))
+                current_chunk = []
+                current_size = 0
+        
+        if current_chunk:
+            chunks.append(' '.join(current_chunk))
+        
+        if not chunks:
+            chunks = [analysis]
+        
+        logger.info(f"📊 Split into {len(chunks)} chunks")
+        
+        # Build summaries
+        summaries = [ch[:300] + "..." if len(ch) > 300 else ch for ch in chunks]
+        
+        # Initialize retriever
+        retriever = SimpleInMemoryRetriever()
+        retriever.add_documents(chunks, summaries)
+        
+        # Store in session
+        active_sessions[session_id] = {
+            "retriever": retriever,
+            "rag_chain": _build_rag_chain(retriever),
+            "file_path": file_path,
+            "file_name": Path(file_path).name,
+            "processed_at": time.time(),
+        }
+        
+        logger.info(f"✅ Session created: {session_id[:8]}... ({len(retriever.documents)} docs)")
+        return retriever
+        
+    except FileNotFoundError as exc:
+        logger.error(f"❌ File error: {exc}")
+        raise
+    except ValueError as exc:
+        logger.error(f"❌ Image content error: {exc}")
+        raise
+    except Exception as exc:
+        logger.error(f"❌ Image processing error: {exc}", exc_info=True)
+        raise Exception(f"Failed to process image: {str(exc)}")
 
 
 def _build_rag_chain(retriever: SimpleInMemoryRetriever):
