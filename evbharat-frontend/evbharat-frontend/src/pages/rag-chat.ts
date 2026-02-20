@@ -546,7 +546,7 @@ export async function renderRAGChatPage() {
                     <div style="background:linear-gradient(135deg, rgba(17,24,39,.7), rgba(31,41,55,.5));border:1px solid rgba(75,85,99,.3);border-radius:12px;padding:14px;backdrop-filter:blur(8px);box-shadow:0 2px 8px rgba(0,0,0,.1)">
                         <h4 style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:#9ca3af;margin-bottom:12px;display:flex;align-items:center;gap:6px"><i class="fa-solid fa-shield-halved" style="color:#D4AF37;font-size:12px"></i>🚀 Capabilities</h4>
                         <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px">
-                            ${['⚡ FAME II / PM E-DRIVE subsidy guidance', '🗺️ State-wise EV policy comparison', '🛡️ BIS / AIS safety-standard checks', '💰 GST, income-tax & import-duty rules', '🔌 Charging-infra & DISCOM approvals', '📋 PDF analysis & compliance audit'].map(c =>
+                            ${['⚡ FAME II / PM E-DRIVE subsidy guidance', '🗺️ State-wise EV policy comparison', '🛡️ BIS / AIS safety-standard checks', '� GST, income-tax & import-duty rules', '🔌 Charging-infra & DISCOM approvals', '� PDF analysis & compliance audit'].map(c =>
                                 `<li style="display:flex;align-items:flex-start;gap:8px;font-size:11px;color:#c1c7cd;padding:6px 8px;border-radius:6px;background:rgba(212,175,55,.03);border:1px solid rgba(212,175,55,.08);transition:all .2s"><div style="width:16px;height:16px;border-radius:4px;background:linear-gradient(135deg, rgba(16,185,129,.2), rgba(52,211,153,.1));display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px"><i class="fa-solid fa-check" style="color:#10b981;font-size:8px"></i></div><span style="line-height:1.4;font-weight:400">${c}</span></li>`).join('')}
                         </ul>
                     </div>
@@ -618,8 +618,6 @@ export async function renderRAGChatPage() {
                                 </button>
                             </div>
                             <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding:0 4px">
-                                <span style="font-size:10px;color:#64748b;font-weight:500">✨ <i class="fa-solid fa-sparkles" style="color:rgba(212,175,55,.4);margin-right:4px"></i>Powered by Google Gemini</span>
-                                <span style="font-size:10px;color:#64748b;font-weight:500">⏎ Press Enter to send</span>
                             </div>
                         </div>
                     </div>
