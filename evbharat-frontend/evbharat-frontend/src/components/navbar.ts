@@ -41,6 +41,9 @@ export class Navbar {
                                 <a href="/battery" class="flex items-center gap-3 px-4 py-3 text-sm hover:bg-pagani-gold/20 hover:text-pagani-gold transition-all border-b border-pagani-gold/10">
                                     <i class="fa-solid fa-car-battery w-5"></i> Battery Health
                                 </a>
+                                <a href="/rag-chat" class="flex items-center gap-3 px-4 py-3 text-sm hover:bg-pagani-gold/20 hover:text-pagani-gold transition-all border-b border-pagani-gold/10">
+                                    <i class="fa-solid fa-robot w-5"></i> AI Assistant
+                                </a>
                                 <a href="/map" class="flex items-center gap-3 px-4 py-3 text-sm hover:bg-pagani-gold/20 hover:text-pagani-gold transition-all border-b border-pagani-gold/10">
                                     <i class="fa-solid fa-route w-5"></i> Route Planner
                                 </a>
@@ -99,6 +102,9 @@ export class Navbar {
                                 </a>
                                 <a href="/battery" class="mobile-nav-link flex items-center justify-center gap-3 text-lg tracking-wider uppercase hover:text-pagani-gold transition-colors">
                                     <i class="fa-solid fa-car-battery"></i> Battery
+                                </a>
+                                <a href="/rag-chat" class="mobile-nav-link flex items-center justify-center gap-3 text-lg tracking-wider uppercase hover:text-pagani-gold transition-colors">
+                                    <i class="fa-solid fa-robot"></i> AI Assistant
                                 </a>
                                 <a href="/map" class="mobile-nav-link flex items-center justify-center gap-3 text-lg tracking-wider uppercase hover:text-pagani-gold transition-colors">
                                     <i class="fa-solid fa-route"></i> Route Planner

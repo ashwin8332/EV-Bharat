@@ -12,6 +12,7 @@ import { renderAuthPage } from './pages/auth';
 import { renderDashboardPage } from './pages/dashboard';
 import { renderBatteryPage } from './pages/battery';
 import { renderBatteryAnalyticsPage } from './pages/battery-analytics';
+import { renderRAGChatPage } from './pages/rag-chat';
 import { renderMapPage } from './pages/map';
 import { renderAlertPage } from './pages/alerts';
 import { render404Page } from './pages/404';
@@ -34,6 +35,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     router.register('/dashboard', 'Dashboard | EVBharat', renderDashboardPage);
     router.register('/battery', 'Battery Management | EVBharat', renderBatteryPage);
     router.register('/battery-analytics', 'AI Battery Analytics | EVBharat', renderBatteryAnalyticsPage);
+    router.register('/rag-chat', 'AI Assistant | EVBharat', renderRAGChatPage);
     router.register('/map', 'Route Planner | EVBharat', renderMapPage);
     router.register('/alerts', 'Alerts | EVBharat', renderAlertPage);
     router.register('/404', '404 Not Found | EVBharat', render404Page);

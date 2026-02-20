@@ -28,10 +28,10 @@ def setup_ml_backend():
     
     # Check for required model files
     required_files = [
-        "soc_model.pkl",
-        "soh_model.pkl", 
-        "rul_model.pkl",
-        "scaler.pkl",
+        "SOC_model.pkl",
+        "SOH_model.pkl", 
+        "RUL_model.pkl",
+        "RUL_scaler.pkl",
         "battery_intelligence.pkl",
         "battery_api.py"
     ]
@@ -57,11 +57,17 @@ def run_backend():
     
     # Import and run the battery API
     models_dir = backend_dir / "ML" / "battery_models"
-    sys.path.append(str(models_dir))
+    sys.path.insert(0, str(models_dir))
     
     try:
-        # Import the battery API module
-        from battery_api import app
+        # Dynamic import to avoid linting warnings
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("battery_api", models_dir / "battery_api.py")
+        battery_api_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(battery_api_module)
+        
+        app = battery_api_module.app
+        
         print("🚀 Starting Battery ML API Server...")
         print("📊 ML Models loaded successfully!")
         print("🌐 API will be available at: http://localhost:8000")
@@ -73,7 +79,7 @@ def run_backend():
             app,
             host="0.0.0.0",
             port=8000,
-            reload=True,
+            reload=False,  # Disable reload to avoid file watching issues
             log_level="info"
         )
         

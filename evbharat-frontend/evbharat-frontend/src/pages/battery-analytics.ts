@@ -20,6 +20,8 @@ interface BatteryAnalysis {
             level: 'INFO' | 'WARNING' | 'CRITICAL';
             recommendation: string;
         }>;
+        intelligence_version?: string;
+        assessment_confidence?: number;
     };
     error?: string;
 }
@@ -148,6 +150,44 @@ export async function renderBatteryAnalyticsPage() {
                                     <option value="fresh">Fresh Battery (0-6 months)</option>
                                     <option value="aged">Aged Battery (6+ months)</option>
                                 </select>
+                            </div>
+
+                            <!-- Cycle Count Input -->
+                            <div>
+                                <label class="block text-sm font-orbitron text-gray-300 mb-2">Cycle Count</label>
+                                <div class="relative">
+                                    <input 
+                                        type="number" 
+                                        id="cycle-count-input" 
+                                        name="cycle_count"
+                                        min="0" 
+                                        max="5000" 
+                                        value="150"
+                                        class="w-full px-4 py-3 bg-gray-800/50 border border-pagani-gold/30 rounded-lg text-white font-orbitron focus:outline-none focus:border-pagani-gold focus:bg-gray-800"
+                                        placeholder="150"
+                                    >
+                                    <span class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">cycles</span>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">Full charge-discharge cycles completed</p>
+                            </div>
+
+                            <!-- Age in Days Input -->
+                            <div>
+                                <label class="block text-sm font-orbitron text-gray-300 mb-2">Age in Days</label>
+                                <div class="relative">
+                                    <input 
+                                        type="number" 
+                                        id="age-days-input" 
+                                        name="age_days"
+                                        min="1" 
+                                        max="3650" 
+                                        value="400"
+                                        class="w-full px-4 py-3 bg-gray-800/50 border border-pagani-gold/30 rounded-lg text-white font-orbitron focus:outline-none focus:border-pagani-gold focus:bg-gray-800"
+                                        placeholder="400"
+                                    >
+                                    <span class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">days</span>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">Calendar days since first use (1-3650)</p>
                             </div>
 
                             <!-- Quick Scenario Buttons -->
@@ -351,10 +391,10 @@ function initializeBatteryAnalyticsPage() {
 
     function setupScenarioButtons() {
         const scenarios = {
-            'scenario-normal': { voltage: 3.7, current: -5, temperature: 25, cell_age: 'fresh' },
-            'scenario-charging': { voltage: 4.0, current: 15, temperature: 35, cell_age: 'fresh' },
-            'scenario-cold': { voltage: 3.5, current: -3, temperature: -5, cell_age: 'fresh' },
-            'scenario-critical': { voltage: 3.1, current: -1, temperature: 20, cell_age: 'aged' }
+            'scenario-normal': { voltage: 3.7, current: -5, temperature: 25, cell_age: 'fresh', cycle_count: 75, age_days: 200 },
+            'scenario-charging': { voltage: 4.0, current: 15, temperature: 35, cell_age: 'fresh', cycle_count: 120, age_days: 150 },
+            'scenario-cold': { voltage: 3.5, current: -3, temperature: -5, cell_age: 'fresh', cycle_count: 90, age_days: 180 },
+            'scenario-critical': { voltage: 3.1, current: -1, temperature: 20, cell_age: 'aged', cycle_count: 800, age_days: 1200 }
         };
 
         Object.entries(scenarios).forEach(([id, scenario]) => {
@@ -364,6 +404,8 @@ function initializeBatteryAnalyticsPage() {
                 (document.getElementById('current-input') as HTMLInputElement).value = scenario.current.toString();
                 (document.getElementById('temperature-input') as HTMLInputElement).value = scenario.temperature.toString();
                 (document.getElementById('cell-age-input') as HTMLSelectElement).value = scenario.cell_age;
+                (document.getElementById('cycle-count-input') as HTMLInputElement).value = scenario.cycle_count.toString();
+                (document.getElementById('age-days-input') as HTMLInputElement).value = scenario.age_days.toString();
                 
                 showNotification(`Applied ${id.split('-')[1]} scenario`, 'success');
             });
@@ -387,7 +429,9 @@ function initializeBatteryAnalyticsPage() {
                 voltage: parseFloat(formData.get('voltage') as string),
                 current: parseFloat(formData.get('current') as string),
                 temperature: parseFloat(formData.get('temperature') as string),
-                cell_age: formData.get('cell_age') as string
+                cell_age: formData.get('cell_age') as string,
+                cycle_count: parseInt(formData.get('cycle_count') as string) || 150,
+                age_days: parseInt(formData.get('age_days') as string) || 400
             });
 
             // Hide loading
@@ -431,7 +475,63 @@ function initializeBatteryAnalyticsPage() {
                 </div>
                 <div class="text-center p-4 ${colors.bg} ${colors.border} border rounded-lg">
                     <p class="text-2xl font-orbitron font-bold ${colors.text}">${Math.round(predictions.RUL)}</p>
-                    <p class="text-xs text-gray-400 mt-1">REMAINING CYCLES</p>
+                    <p class="text-xs text-gray-400 mt-1">REMAINING DAYS</p>
+                </div>
+            </div>
+
+            <!-- RUL Detailed Information -->
+            <div class="mb-6 p-4 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/30 rounded-lg">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-hourglass-half text-blue-400"></i>
+                        <span class="text-sm font-orbitron text-gray-300">Remaining Useful Life Analysis</span>
+                    </div>
+                    <span class="text-lg font-bold text-blue-400">${Math.round(predictions.RUL)} days</span>
+                </div>
+                <div class="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                        <p class="text-xs text-gray-400">Weeks</p>
+                        <p class="text-lg font-orbitron text-blue-400">${Math.round(predictions.RUL / 7)}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-400">Months</p>
+                        <p class="text-lg font-orbitron text-blue-400">${Math.round(predictions.RUL / 30)}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-400">Est. Years</p>
+                        <p class="text-lg font-orbitron text-blue-400">${(predictions.RUL / 365).toFixed(1)}</p>
+                    </div>
+                </div>
+                <div class="mt-3 text-xs text-gray-400 text-center">
+                    ${predictions.RUL < 90 ? '⚠️ Replacement recommended soon' : 
+                      predictions.RUL < 365 ? '📋 Plan for replacement within a year' : 
+                      '✅ Battery has good remaining lifespan'}
+                </div>
+            </div>
+
+            <!-- Battery Intelligence System Info -->
+            <div class="mb-6 p-4 bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-lg">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-brain text-purple-400"></i>
+                        <span class="text-sm font-orbitron text-gray-300">Battery Intelligence System</span>
+                    </div>
+                    <span class="text-sm font-orbitron text-purple-400">
+                        v${analysis.intelligence_version || '2.0.0'}
+                    </span>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="text-center p-3 bg-purple-500/5 rounded-lg">
+                        <p class="text-lg font-orbitron text-purple-400">${((analysis.assessment_confidence || 0.85) * 100).toFixed(1)}%</p>
+                        <p class="text-xs text-gray-400">Assessment Confidence</p>
+                    </div>
+                    <div class="text-center p-3 bg-purple-500/5 rounded-lg">
+                        <p class="text-lg font-orbitron text-purple-400">${analysis.risk_level}</p>
+                        <p class="text-xs text-gray-400">Risk Classification</p>
+                    </div>
+                </div>
+                <div class="mt-3 text-xs text-gray-400 text-center">
+                    🧠 Enhanced ML predictions with battery intelligence factors
                 </div>
             </div>
 
@@ -480,11 +580,17 @@ function initializeBatteryAnalyticsPage() {
             <!-- Confidence Score -->
             <div class="mt-6 p-3 bg-pagani-black/50 rounded-lg border border-pagani-gold/20">
                 <div class="flex justify-between items-center">
-                    <span class="text-sm text-gray-400">Prediction Confidence</span>
+                    <span class="text-sm text-gray-400">ML Model Confidence</span>
                     <span class="text-pagani-gold font-orbitron">${(predictions.confidence * 100).toFixed(1)}%</span>
                 </div>
                 <div class="w-full bg-gray-700 rounded-full h-2 mt-2">
-                    <div class="bg-pagani-gold h-2 rounded-full" style="width: ${predictions.confidence * 100}%"></div>
+                    <div class="bg-pagani-gold h-2 rounded-full transition-all duration-1000" style="width: ${predictions.confidence * 100}%"></div>
+                </div>
+                <div class="mt-2 text-xs text-gray-400 text-center">
+                    ${predictions.confidence > 0.9 ? ' Very High Confidence' : 
+                      predictions.confidence > 0.8 ? ' High Confidence' : 
+                      predictions.confidence > 0.7 ? ' Medium Confidence' : 
+                      '🔄 Low Confidence - Consider retesting'}
                 </div>
             </div>
         `;
@@ -519,7 +625,7 @@ function initializeBatteryAnalyticsPage() {
         chartContainer.innerHTML = `
             <div class="w-full">
                 <div class="flex justify-between items-end h-40 border-l border-b border-gray-600 pl-4 pb-4">
-                    ${latest.map((data, i) => `
+                    ${latest.map((data) => `
                         <div class="flex-1 flex flex-col items-center gap-2">
                             <div class="flex flex-col gap-1">
                                 <div class="w-8 bg-green-500 rounded-t" style="height: ${data.soc}px" title="SOC: ${data.soc.toFixed(1)}%"></div>
@@ -553,95 +659,138 @@ function initializeBatteryAnalyticsPage() {
 }
 
 async function simulateMLPrediction(input: any): Promise<BatteryAnalysis> {
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    // Mock ML model logic based on input parameters
-    const { voltage, current, temperature, cell_age } = input;
-    
-    // Calculate SOC based on voltage (simplified OCV curve)
-    let soc = Math.max(0, Math.min(100, (voltage - 2.5) / (4.2 - 2.5) * 100));
-    
-    // Calculate SOH based on age and temperature stress
-    let soh = cell_age === 'fresh' ? 95 - Math.abs(temperature - 25) * 0.5 : 85 - Math.abs(temperature - 25) * 0.8;
-    soh = Math.max(50, Math.min(100, soh));
-    
-    // Calculate RUL based on SOH and current usage
-    let rul = (soh - 70) * 40; // Simplified cycle life estimation
-    rul = Math.max(0, Math.min(2000, rul));
-    
-    // Determine risk level and generate alerts
-    const overallHealth = (soc + soh) / 2;
-    let riskLevel: 'LOW' | 'MEDIUM' | 'CRITICAL';
-    const alerts: any[] = [];
-    
-    if (overallHealth >= 80) {
-        riskLevel = 'LOW';
-        alerts.push({
-            type: 'Battery Health Excellent',
-            message: 'Your battery is operating within optimal parameters.',
-            level: 'INFO',
-            recommendation: 'Continue current charging habits for maximum lifespan.'
+    try {
+        // Try to call the real ML API first
+        const mlApiUrl = 'http://localhost:8000';
+        
+        const requestBody = {
+            voltage: input.voltage,
+            current: input.current,
+            temperature: input.temperature,
+            cycle_count: input.cycle_count || 150,
+            age_days: input.age_days || (input.cell_age === 'fresh' ? 200 : 800)
+        };
+        
+        const response = await fetch(`${mlApiUrl}/predict`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestBody)
         });
-    } else if (overallHealth >= 65) {
-        riskLevel = 'MEDIUM';
-        alerts.push({
-            type: 'Moderate Degradation Detected',
-            message: 'Battery showing signs of aging but still functional.',
-            level: 'WARNING',
-            recommendation: 'Avoid extreme temperatures and deep discharge cycles.'
-        });
-    } else {
-        riskLevel = 'CRITICAL';
-        alerts.push({
-            type: 'Battery Health Critical',
-            message: 'Significant degradation detected. Consider replacement.',
-            level: 'CRITICAL',
-            recommendation: 'Schedule immediate battery inspection and replacement planning.'
-        });
-    }
-
-    // Temperature-based alerts
-    if (temperature > 40) {
-        alerts.push({
-            type: 'High Temperature Warning',
-            message: 'Battery temperature exceeds safe operating range.',
-            level: 'WARNING',
-            recommendation: 'Allow battery to cool before charging or heavy usage.'
-        });
-    } else if (temperature < 0) {
-        alerts.push({
-            type: 'Cold Temperature Alert',
-            message: 'Low temperature may reduce battery performance.',
-            level: 'INFO',
-            recommendation: 'Pre-condition battery before use in cold weather.'
-        });
-    }
-
-    // Current-based alerts
-    if (Math.abs(current) > 50) {
-        alerts.push({
-            type: 'High Current Draw',
-            message: 'Excessive current may accelerate battery degradation.',
-            level: 'WARNING',    
-            recommendation: 'Reduce power demand or use more conservative driving mode.'
-        });
-    }
-
-    return {
-        status: 'success',
-        predictions: {
-            SOC: soc,
-            SOH: soh,
-            RUL: rul,
-            confidence: 0.85 + Math.random() * 0.1
-        },
-        analysis: {
-            overall_health: overallHealth,
-            risk_level: riskLevel,
-            alerts
+        
+        if (response.ok) {
+            const result = await response.json();
+            // Convert API response to expected format
+            return {
+                status: result.status,
+                predictions: result.predictions,
+                analysis: result.analysis,
+                error: result.error
+            };
+        } else {
+            throw new Error(`ML API returned ${response.status}`);
         }
-    };
+        
+    } catch (apiError) {
+        console.warn('ML API not available, using fallback simulation:', apiError);
+        
+        // Fallback to simulation logic
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        const { voltage, current, temperature, cycle_count = 150, age_days = 400 } = input;
+        
+        // Calculate SOC based on voltage (simplified OCV curve)
+        let soc = Math.max(0, Math.min(100, (voltage - 2.5) / (4.2 - 2.5) * 100));
+        
+        // Calculate SOH based on age, temperature stress, and cycle count
+        let cycleDegrad = Math.min(30, cycle_count / 100); // Degradation from cycles
+        let ageDegrad = Math.min(20, age_days / 365 * 5); // Degradation from aging
+        let tempDegrad = Math.abs(temperature - 25) * 0.3; // Temperature stress
+        
+        let soh = 100 - cycleDegrad - ageDegrad - tempDegrad;
+        soh = Math.max(50, Math.min(100, soh));
+        
+        // Calculate RUL based on SOH and current degradation rate
+        const degradationRate = (cycleDegrad + ageDegrad) / (cycle_count + age_days / 7); // per cycle/week
+        let rul = Math.max(50, (soh - 80) / (degradationRate + 0.001) * 7); // days remaining
+        rul = Math.max(100, Math.min(3000, rul));
+        
+        // Determine risk level and generate alerts
+        const overallHealth = (soc + soh) / 2;
+        let riskLevel: 'LOW' | 'MEDIUM' | 'CRITICAL';
+        const alerts: any[] = [];
+        
+        if (overallHealth >= 80) {
+            riskLevel = 'LOW';
+            alerts.push({
+                type: 'Battery Health Excellent',
+                message: 'Your battery is operating within optimal parameters.',
+                level: 'INFO',
+                recommendation: 'Continue current charging habits for maximum lifespan.'
+            });
+        } else if (overallHealth >= 65) {
+            riskLevel = 'MEDIUM';
+            alerts.push({
+                type: 'Moderate Degradation Detected',
+                message: 'Battery showing signs of aging but still functional.',
+                level: 'WARNING',
+                recommendation: 'Avoid extreme temperatures and deep discharge cycles.'
+            });
+        } else {
+            riskLevel = 'CRITICAL';
+            alerts.push({
+                type: 'Battery Health Critical',
+                message: 'Significant degradation detected. Consider replacement.',
+                level: 'CRITICAL',
+                recommendation: 'Schedule immediate battery inspection and replacement planning.'
+            });
+        }
+
+        // Temperature-based alerts
+        if (temperature > 40) {
+            alerts.push({
+                type: 'High Temperature Warning',
+                message: 'Battery temperature exceeds safe operating range.',
+                level: 'WARNING',
+                recommendation: 'Allow battery to cool before charging or heavy usage.'
+            });
+        } else if (temperature < 0) {
+            alerts.push({
+                type: 'Cold Temperature Alert',
+                message: 'Low temperature may reduce battery performance.',
+                level: 'INFO',
+                recommendation: 'Pre-condition battery before use in cold weather.'
+            });
+        }
+
+        // Current-based alerts
+        if (Math.abs(current) > 50) {
+            alerts.push({
+                type: 'High Current Draw',
+                message: 'Excessive current may accelerate battery degradation.',
+                level: 'WARNING',    
+                recommendation: 'Reduce power demand or use more conservative driving mode.'
+            });
+        }
+
+        return {
+            status: 'success',
+            predictions: {
+                SOC: soc,
+                SOH: soh,
+                RUL: rul,
+                confidence: 0.85 + Math.random() * 0.1
+            },
+            analysis: {
+                overall_health: overallHealth,
+                risk_level: riskLevel,
+                alerts,
+                intelligence_version: 'EVBharat AI v2.1',
+                assessment_confidence: Math.round((0.85 + Math.random() * 0.1) * 100)
+            }
+        };
+    }
 }
 
 function showNotification(message: string, type: 'success' | 'error') {

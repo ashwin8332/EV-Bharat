@@ -271,9 +271,6 @@ def main():
                 logging.info(f"Response: {response_message}, Duration: {duration:.2f} s")
 
 
-    
-
-
 
 if __name__ == "__main__":
     main()
