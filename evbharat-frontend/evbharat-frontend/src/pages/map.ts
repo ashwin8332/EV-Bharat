@@ -84,9 +84,8 @@ export async function renderMapPage() {
                                     <input 
                                         type="text" 
                                         id="start-location"
-                                        class="w-full pl-10 pr-4 py-3 bg-gray-800/50 border border-pagani-gold/30 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-pagani-gold transition-all" 
-                                        placeholder="Starting point"
-                                        value="New Delhi, India"
+                                        class="w-full pl-10 pr-12 py-3 bg-gray-800/50 border border-pagani-gold/30 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-pagani-gold transition-all" 
+                                        placeholder="Enter starting point"
                                     />
                                 </div>
 
@@ -98,8 +97,7 @@ export async function renderMapPage() {
                                         type="text" 
                                         id="end-location"
                                         class="w-full pl-10 pr-4 py-3 bg-gray-800/50 border border-pagani-gold/30 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-pagani-gold transition-all" 
-                                        placeholder="Destination"
-                                        value="Jaipur, Rajasthan"
+                                        placeholder="Enter destination"
                                     />
                                 </div>
 
@@ -128,10 +126,10 @@ export async function renderMapPage() {
                                     <p class="text-xs text-gray-400 mt-1">Range</p>
                                 </div>
                             </div>
-                            <div class="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-                                <p class="text-xs text-yellow-400">
-                                    <i class="fa-solid fa-lightbulb mr-1"></i>
-                                    Your current range covers this trip with 1 charging stop recommended.
+                            <div class="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                                <p class="text-xs text-blue-400">
+                                    <i class="fa-solid fa-info-circle mr-1"></i>
+                                    Enter route details to calculate optimal charging strategy.
                                 </p>
                             </div>
                         </div>
@@ -174,23 +172,23 @@ export async function renderMapPage() {
                             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 <div class="text-center p-4 bg-pagani-black/50 rounded-lg border border-pagani-gold/10">
                                     <i class="fa-solid fa-road text-2xl text-pagani-gold mb-2"></i>
-                                    <p class="text-2xl font-orbitron font-bold" data-trip="km">268</p>
+                                    <p class="text-2xl font-orbitron font-bold" data-trip="km">--</p>
                                     <p class="text-xs text-gray-400 mt-1">Kilometers</p>
                                 </div>
                                 <div class="text-center p-4 bg-pagani-black/50 rounded-lg border border-pagani-gold/10">
                                     <i class="fa-solid fa-clock text-2xl text-blue-400 mb-2"></i>
-                                    <p class="text-2xl font-orbitron font-bold" data-trip="dur">4h 15m</p>
+                                    <p class="text-2xl font-orbitron font-bold" data-trip="dur">--</p>
                                     <p class="text-xs text-gray-400 mt-1">Duration</p>
                                 </div>
                                 <div class="text-center p-4 bg-pagani-black/50 rounded-lg border border-pagani-gold/10">
                                     <i class="fa-solid fa-bolt text-2xl text-yellow-400 mb-2"></i>
-                                    <p class="text-2xl font-orbitron font-bold">42 kWh</p>
+                                    <p class="text-2xl font-orbitron font-bold" data-trip="energy">-- kWh</p>
                                     <p class="text-xs text-gray-400 mt-1">Energy Needed</p>
                                 </div>
                                 <div class="text-center p-4 bg-pagani-black/50 rounded-lg border border-pagani-gold/10">
                                     <i class="fa-solid fa-charging-station text-2xl text-green-400 mb-2"></i>
-                                    <p class="text-2xl font-orbitron font-bold">1</p>
-                                    <p class="text-xs text-gray-400 mt-1">Charging Stop</p>
+                                    <p class="text-2xl font-orbitron font-bold" data-trip="stops">--</p>
+                                    <p class="text-xs text-gray-400 mt-1">Charging Stops</p>
                                 </div>
                             </div>
                         </div>
@@ -482,7 +480,7 @@ function initializeMapPage() {
                             <span class="text-yellow-400"><i class="fa-solid fa-star mr-1"></i>${station.rating}</span>
                         </div>
                     </div>
-                    <button class="px-4 py-DELHI2 bg-pagani-gold/20 border border-pagani-gold/50 rounded-lg text-pagani-gold text-xs font-orbitron hover:bg-pagani-gold hover:text-black transition-all whitespace-nowrap">
+                    <button class="px-4 py-2 bg-pagani-gold/20 border border-pagani-gold/50 rounded-lg text-pagani-gold text-xs font-orbitron hover:bg-pagani-gold hover:text-black transition-all whitespace-nowrap">
                         Navigate
                     </button>
                 </div>
@@ -558,6 +556,37 @@ function setupLocationInputs() {
                 const place = endAutocomplete!.getPlace();
                 if (place.geometry?.location) {
                     updateDestinationMarker(place.geometry.location, place.name || place.formatted_address || 'Destination');
+                }
+            });
+            
+            // Add input listeners to clear markers and analysis when inputs are cleared
+            startInput.addEventListener('input', (e) => {
+                const value = (e.target as HTMLInputElement).value.trim();
+                if (!value) {
+                    if (originMarker) {
+                        originMarker.setMap(null);
+                        originMarker = null;
+                    }
+                    if (directionsRenderer) {
+                        directionsRenderer.setMap(null);
+                        directionsRenderer.setMap(googleMap);
+                    }
+                    resetTripAnalysis();
+                }
+            });
+            
+            endInput.addEventListener('input', (e) => {
+                const value = (e.target as HTMLInputElement).value.trim();
+                if (!value) {
+                    if (destinationMarker) {
+                        destinationMarker.setMap(null);
+                        destinationMarker = null;
+                    }
+                    if (directionsRenderer) {
+                        directionsRenderer.setMap(null);
+                        directionsRenderer.setMap(googleMap);
+                    }
+                    resetTripAnalysis();
                 }
             });
         }
@@ -664,10 +693,43 @@ function calculateDynamicRoute() {
                         // Update trip analysis
                         const leg = result.routes[0]?.legs[0];
                         if (leg) {
+                            const distance = Math.round((leg.distance?.value ?? 0) / 1000);
                             const kmEl = document.querySelector('[data-trip="km"]');
                             const durEl = document.querySelector('[data-trip="dur"]');
-                            if (kmEl) kmEl.textContent = String(Math.round((leg.distance?.value ?? 0) / 1000));
+                            const energyEl = document.querySelector('[data-trip="energy"]');
+                            const stopsEl = document.querySelector('[data-trip="stops"]');
+                            
+                            if (kmEl) kmEl.textContent = String(distance);
                             if (durEl) durEl.textContent = leg.duration?.text ?? '';
+                            
+                            // Calculate estimated energy consumption (approx 0.2 kWh/km for EV)
+                            const estimatedEnergy = Math.round(distance * 0.2);
+                            if (energyEl) energyEl.textContent = `${estimatedEnergy} kWh`;
+                            
+                            // Estimate charging stops based on distance and current battery (87% = ~392km range)
+                            const currentRange = 392;
+                            const estimatedStops = distance > currentRange ? Math.ceil((distance - currentRange) / 300) : 0;
+                            if (stopsEl) stopsEl.textContent = String(estimatedStops);
+                            
+                            // Update battery status notification
+                            const batteryNotification = document.querySelector('.bg-blue-500\\/10 p');
+                            if (batteryNotification) {
+                                if (estimatedStops === 0) {
+                                    batteryNotification.innerHTML = `
+                                        <i class="fa-solid fa-check-circle mr-1"></i>
+                                        Your current range covers this ${distance}km trip without charging stops needed.
+                                    `;
+                                    batteryNotification.parentElement!.className = 'mt-4 p-3 bg-green-500/10 border border-green-500/30 rounded-lg';
+                                    batteryNotification.className = 'text-xs text-green-400';
+                                } else {
+                                    batteryNotification.innerHTML = `
+                                        <i class="fa-solid fa-lightbulb mr-1"></i>
+                                        Your ${distance}km trip will need ${estimatedStops} charging stop${estimatedStops > 1 ? 's' : ''}.
+                                    `;
+                                    batteryNotification.parentElement!.className = 'mt-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg';
+                                    batteryNotification.className = 'text-xs text-yellow-400';
+                                }
+                            }
                         }
                         
                         // Fit map to route
@@ -689,6 +751,7 @@ function calculateDynamicRoute() {
             } else {
                 calculateBtn.innerHTML = '<i class="fa-solid fa-exclamation-triangle mr-2"></i> Invalid Locations';
                 showNotification('Could not find one or both locations. Please check spelling.', 'error');
+                resetTripAnalysis();
                 setTimeout(() => {
                     calculateBtn.innerHTML = '<i class="fa-solid fa-magnifying-glass-location mr-2"></i> Calculate Route';
                 }, 3000);
@@ -743,6 +806,32 @@ function handleRouteError(status: google.maps.DirectionsStatus) {
     
     calculateBtn.innerHTML = '<i class="fa-solid fa-exclamation-triangle mr-2"></i> Route Failed';
     showNotification(message, 'error');
+    
+    // Reset trip analysis to placeholders
+    resetTripAnalysis();
+}
+
+function resetTripAnalysis() {
+    const kmEl = document.querySelector('[data-trip="km"]');
+    const durEl = document.querySelector('[data-trip="dur"]');
+    const energyEl = document.querySelector('[data-trip="energy"]');
+    const stopsEl = document.querySelector('[data-trip="stops"]');
+    
+    if (kmEl) kmEl.textContent = '--';
+    if (durEl) durEl.textContent = '--';
+    if (energyEl) energyEl.textContent = '-- kWh';
+    if (stopsEl) stopsEl.textContent = '--';
+    
+    // Reset battery status notification
+    const batteryNotification = document.querySelector('.bg-green-500\\/10 p, .bg-yellow-500\\/10 p, .bg-blue-500\\/10 p');
+    if (batteryNotification) {
+        batteryNotification.innerHTML = `
+            <i class="fa-solid fa-info-circle mr-1"></i>
+            Enter route details to calculate optimal charging strategy.
+        `;
+        batteryNotification.parentElement!.className = 'mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg';
+        batteryNotification.className = 'text-xs text-blue-400';
+    }
 }
 
 function addCurrentLocationButton() {
