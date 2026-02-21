@@ -86,7 +86,7 @@ export async function renderTechnologyPage() {
                             <span class="w-12 h-[2px] bg-pagani-gold"></span>
                             <span class="text-pagani-gold tracking-[0.3em] uppercase text-sm">Navigation</span>
                         </div>
-                        <h2 class="text-4xl md:text-5xl font-orbitron font-bold mb-6">INTELLIGENT<br><span class="text-pagani-gold">ROUTING</span></h2>
+                        <h2 class="text-4xl md:text-5xl font-orbitron font-bold mb-6 cursor-pointer hover:text-pagani-gold transition-colors" id="intelligent-routing-title">INTELLIGENT<br><span class="text-pagani-gold">ROUTING</span></h2>
                         <p class="text-gray-400 text-lg leading-relaxed mb-8">
                             Traffic-aware route optimization that considers real-time conditions, elevation changes, and energy consumption to deliver the most efficient path.
                         </p>
@@ -174,10 +174,15 @@ export async function renderTechnologyPage() {
     const animator = new ScrollAnimator(0.1);
     animator.observeAll('.fade-in-section');
 
-    // Add click handler for Battery Health Prediction
+    // Add click handlers for AI Features
     const batteryHealthTitle = document.getElementById('battery-health-title');
     if (batteryHealthTitle) {
         batteryHealthTitle.addEventListener('click', openBatteryHealthWindow);
+    }
+
+    const intelligentRoutingTitle = document.getElementById('intelligent-routing-title');
+    if (intelligentRoutingTitle) {
+        intelligentRoutingTitle.addEventListener('click', openIntelligentRoutingWindow);
     }
 }
 
@@ -318,4 +323,153 @@ function openBatteryHealthWindow() {
     `;
 
     modal.open(batteryHealthContent, 'BATTERY HEALTH PREDICTION');
+}
+function openIntelligentRoutingWindow() {
+    const intelligentRoutingContent = `
+        <div class="space-y-8">
+            <!-- Header -->
+            <div class="text-center mb-8">
+                <div class="text-7xl mb-4">🗺️</div>
+                <h3 class="text-3xl font-orbitron font-bold mb-2">AI Intelligent Routing System</h3>
+                <p class="text-gray-400">Real-time ML-powered navigation and route optimization</p>
+            </div>
+
+            <!-- Current Route Status -->
+            <div class="bg-gradient-to-br from-pagani-gold/10 to-transparent border border-pagani-gold/30 p-6 rounded-lg">
+                <h4 class="text-xl font-orbitron font-bold mb-4 text-pagani-gold">Current Route Status</h4>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="text-center">
+                        <div class="text-3xl font-bold text-white">12.5 km</div>
+                        <div class="text-sm text-gray-400">Distance to Destination</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-3xl font-bold text-white">18 min</div>
+                        <div class="text-sm text-gray-400">Estimated Time</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-3xl font-bold text-white">6.8 kWh</div>
+                        <div class="text-sm text-gray-400">Energy Required</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-3xl font-bold text-white">78%</div>
+                        <div class="text-sm text-gray-400">Current Charge</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ML Predictions & Analysis -->
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="bg-pagani-black border border-pagani-gold/20 p-6">
+                    <h4 class="text-lg font-orbitron font-bold mb-4 flex items-center gap-2">
+                        <span class="text-pagani-gold">▸</span>
+                        Traffic Prediction
+                    </h4>
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-400">Current Traffic</span>
+                            <span class="text-yellow-500 font-bold">Moderate</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-400">Predicted in 30 min</span>
+                            <span class="text-red-500 font-bold">Heavy</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-400">Route Accuracy</span>
+                            <span class="text-white font-bold">94.7%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-pagani-black border border-pagani-gold/20 p-6">
+                    <h4 class="text-lg font-orbitron font-bold mb-4 flex items-center gap-2">
+                        <span class="text-pagani-gold">▸</span>
+                        Route Optimization
+                    </h4>
+                    <ul class="space-y-3 text-gray-300">
+                        <li class="flex items-start gap-2">
+                            <span class="text-green-500 mt-1">✓</span>
+                            <span>Dynamic route selected for minimal congestion</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <span class="text-green-500 mt-1">✓</span>
+                            <span>Energy consumption optimized</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <span class="text-yellow-500 mt-1">⚠</span>
+                            <span>Weather condition: Light rain ahead</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- AI/ML Features -->
+            <div class="border-t border-pagani-gold/20 pt-6">
+                <h4 class="text-xl font-orbitron font-bold mb-4">AI/ML Features</h4>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-gradient-to-br from-pagani-gold/5 to-transparent border border-pagani-gold/20 p-4">
+                        <div class="text-3xl mb-2">📊</div>
+                        <h5 class="font-bold text-sm mb-1">Real-Time Traffic Prediction</h5>
+                        <p class="text-xs text-gray-400">Live congestion forecasting using ML models</p>
+                    </div>
+                    <div class="bg-gradient-to-br from-pagani-gold/5 to-transparent border border-pagani-gold/20 p-4">
+                        <div class="text-3xl mb-2">🎯</div>
+                        <h5 class="font-bold text-sm mb-1">Dynamic Route Optimization</h5>
+                        <p class="text-xs text-gray-400">AI-powered shortest & fastest path selection</p>
+                    </div>
+                    <div class="bg-gradient-to-br from-pagani-gold/5 to-transparent border border-pagani-gold/20 p-4">
+                        <div class="text-3xl mb-2">⚠️</div>
+                        <h5 class="font-bold text-sm mb-1">Incident Detection & Alerts</h5>
+                        <p class="text-xs text-gray-400">Automatic accident & roadblock identification</p>
+                    </div>
+                    <div class="bg-gradient-to-br from-pagani-gold/5 to-transparent border border-pagani-gold/20 p-4">
+                        <div class="text-3xl mb-2">🌦️</div>
+                        <h5 class="font-bold text-sm mb-1">Weather-Aware Routing</h5>
+                        <p class="text-xs text-gray-400">Route adjustments based on weather conditions</p>
+                    </div>
+                    <div class="bg-gradient-to-br from-pagani-gold/5 to-transparent border border-pagani-gold/20 p-4">
+                        <div class="text-3xl mb-2">⚡</div>
+                        <h5 class="font-bold text-sm mb-1">Energy/Fuel Efficient Routing</h5>
+                        <p class="text-xs text-gray-400">Optimized paths to reduce fuel consumption</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Technical Details -->
+            <div class="bg-pagani-black border border-pagani-gold/20 p-6">
+                <h4 class="text-lg font-orbitron font-bold mb-4">Technical Specifications</h4>
+                <div class="grid md:grid-cols-2 gap-4 text-sm">
+                    <div class="space-y-2">
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">ML Model Type:</span>
+                            <span class="text-white">Graph Neural Network + LSTM</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Prediction Accuracy:</span>
+                            <span class="text-white">96.2%</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Update Frequency:</span>
+                            <span class="text-white">Real-time (100ms)</span>
+                        </div>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Data Sources:</span>
+                            <span class="text-white">GPS, Traffic APIs, Weather</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Training Dataset:</span>
+                            <span class="text-white">500K+ routes analyzed</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Response Time:</span>
+                            <span class="text-white">&lt;200ms for optimization</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    modal.open(intelligentRoutingContent, 'INTELLIGENT ROUTING SYSTEM');
 }
