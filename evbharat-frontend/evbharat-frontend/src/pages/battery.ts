@@ -1,12 +1,5 @@
 import { authService } from '../utils/auth';
 
-interface BatteryCell {
-    id: number;
-    voltage: number;
-    temperature: number;
-    health: number;
-}
-
 export async function renderBatteryPage() {
     // Check if user is authenticated
     if (!authService.isAuthenticated()) {
@@ -245,32 +238,286 @@ export async function renderBatteryPage() {
                 </div>
             </div>
 
-            <!-- Cell Monitoring -->
+            <!-- Graphical Analysis -->
             <div class="max-w-7xl mx-auto px-4 md:px-8 mb-8">
-                <div class="bg-gradient-to-br from-gray-900 to-pagani-black border border-pagani-gold/20 rounded-xl p-6 fade-in-section">
-                    <h3 class="text-xl font-orbitron font-bold mb-6 flex items-center gap-3">
-                        <i class="fa-solid fa-grid-4 text-pagani-gold"></i>
-                        Cell-Level Monitoring
-                    </h3>
-                    <div class="grid grid-cols-4 md:grid-cols-8 lg:grid-cols-12 gap-2" id="cell-grid">
-                        <!-- Cells will be populated by JS -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Battery Health Trend -->
+                    <div class="bg-gradient-to-br from-gray-900 to-pagani-black border border-pagani-gold/20 rounded-xl p-6 fade-in-section">
+                        <div class="flex items-center justify-between mb-6">
+                            <h3 class="text-lg font-orbitron font-bold flex items-center gap-3">
+                                <i class="fa-solid fa-chart-line text-pagani-gold"></i>
+                                Battery Health Trend
+                            </h3>
+                            <span class="text-xs text-gray-400 font-orbitron">LAST 12 MONTHS</span>
+                        </div>
+                        <div class="relative h-52" id="soh-chart">
+                            <!-- Y-axis labels -->
+                            <div class="absolute left-0 top-0 h-full flex flex-col justify-between text-xs text-gray-500 pr-2" style="width:32px">
+                                <span>100%</span><span>96%</span><span>92%</span><span>88%</span>
+                            </div>
+                            <!-- Chart area -->
+                            <div class="ml-10 h-full flex items-end gap-1.5 border-l border-b border-gray-700 pl-2 pb-1">
+                                <div class="chart-bar-group flex flex-col items-center flex-1 gap-1">
+                                    <div class="w-full rounded-t bg-gradient-to-t from-green-600 to-green-400 transition-all duration-1000" data-target-height="100%" style="height:0%"></div>
+                                    <span class="text-[9px] text-gray-500">Mar</span>
+                                </div>
+                                <div class="chart-bar-group flex flex-col items-center flex-1 gap-1">
+                                    <div class="w-full rounded-t bg-gradient-to-t from-green-600 to-green-400 transition-all duration-1000" data-target-height="98%" style="height:0%"></div>
+                                    <span class="text-[9px] text-gray-500">Apr</span>
+                                </div>
+                                <div class="chart-bar-group flex flex-col items-center flex-1 gap-1">
+                                    <div class="w-full rounded-t bg-gradient-to-t from-green-600 to-green-400 transition-all duration-1000" data-target-height="97%" style="height:0%"></div>
+                                    <span class="text-[9px] text-gray-500">May</span>
+                                </div>
+                                <div class="chart-bar-group flex flex-col items-center flex-1 gap-1">
+                                    <div class="w-full rounded-t bg-gradient-to-t from-green-600 to-green-400 transition-all duration-1000" data-target-height="96.5%" style="height:0%"></div>
+                                    <span class="text-[9px] text-gray-500">Jun</span>
+                                </div>
+                                <div class="chart-bar-group flex flex-col items-center flex-1 gap-1">
+                                    <div class="w-full rounded-t bg-gradient-to-t from-green-600 to-green-400 transition-all duration-1000" data-target-height="96%" style="height:0%"></div>
+                                    <span class="text-[9px] text-gray-500">Jul</span>
+                                </div>
+                                <div class="chart-bar-group flex flex-col items-center flex-1 gap-1">
+                                    <div class="w-full rounded-t bg-gradient-to-t from-green-600 to-green-400 transition-all duration-1000" data-target-height="95.5%" style="height:0%"></div>
+                                    <span class="text-[9px] text-gray-500">Aug</span>
+                                </div>
+                                <div class="chart-bar-group flex flex-col items-center flex-1 gap-1">
+                                    <div class="w-full rounded-t bg-gradient-to-t from-green-600 to-green-400 transition-all duration-1000" data-target-height="95.2%" style="height:0%"></div>
+                                    <span class="text-[9px] text-gray-500">Sep</span>
+                                </div>
+                                <div class="chart-bar-group flex flex-col items-center flex-1 gap-1">
+                                    <div class="w-full rounded-t bg-gradient-to-t from-green-600 to-green-400 transition-all duration-1000" data-target-height="95%" style="height:0%"></div>
+                                    <span class="text-[9px] text-gray-500">Oct</span>
+                                </div>
+                                <div class="chart-bar-group flex flex-col items-center flex-1 gap-1">
+                                    <div class="w-full rounded-t bg-gradient-to-t from-yellow-600 to-yellow-400 transition-all duration-1000" data-target-height="94.8%" style="height:0%"></div>
+                                    <span class="text-[9px] text-gray-500">Nov</span>
+                                </div>
+                                <div class="chart-bar-group flex flex-col items-center flex-1 gap-1">
+                                    <div class="w-full rounded-t bg-gradient-to-t from-yellow-600 to-yellow-400 transition-all duration-1000" data-target-height="94.5%" style="height:0%"></div>
+                                    <span class="text-[9px] text-gray-500">Dec</span>
+                                </div>
+                                <div class="chart-bar-group flex flex-col items-center flex-1 gap-1">
+                                    <div class="w-full rounded-t bg-gradient-to-t from-yellow-600 to-yellow-400 transition-all duration-1000" data-target-height="94.2%" style="height:0%"></div>
+                                    <span class="text-[9px] text-gray-500">Jan</span>
+                                </div>
+                                <div class="chart-bar-group flex flex-col items-center flex-1 gap-1">
+                                    <div class="w-full rounded-t bg-gradient-to-t from-pagani-gold to-bright-gold transition-all duration-1000" data-target-height="94%" style="height:0%"></div>
+                                    <span class="text-[9px] text-pagani-gold font-bold">Now</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex items-center justify-between text-xs">
+                            <span class="text-gray-400"><i class="fa-solid fa-arrow-trend-down text-yellow-400 mr-1"></i>-6% over 12 months</span>
+                            <span class="text-green-400"><i class="fa-solid fa-check-circle mr-1"></i>Within normal range</span>
+                        </div>
                     </div>
-                    <div class="mt-4 flex flex-wrap items-center justify-center gap-4 text-xs text-gray-400">
-                        <div class="flex items-center gap-2">
-                            <div class="w-4 h-4 bg-green-500 rounded"></div>
-                            <span>Healthy (95-100%)</span>
+
+                    <!-- Energy Consumption Analysis -->
+                    <div class="bg-gradient-to-br from-gray-900 to-pagani-black border border-pagani-gold/20 rounded-xl p-6 fade-in-section" style="animation-delay: 100ms">
+                        <div class="flex items-center justify-between mb-6">
+                            <h3 class="text-lg font-orbitron font-bold flex items-center gap-3">
+                                <i class="fa-solid fa-bolt text-pagani-gold"></i>
+                                Energy Consumption
+                            </h3>
+                            <span class="text-xs text-gray-400 font-orbitron">LAST 7 DAYS</span>
                         </div>
-                        <div class="flex items-center gap-2">
-                            <div class="w-4 h-4 bg-yellow-500 rounded"></div>
-                            <span>Fair (85-94%)</span>
+                        <div class="space-y-3" id="energy-bars">
+                            <div class="flex items-center gap-3">
+                                <span class="text-xs text-gray-400 w-8">Mon</span>
+                                <div class="flex-1 h-7 bg-gray-800 rounded-full overflow-hidden">
+                                    <div class="h-full bg-gradient-to-r from-blue-600 to-blue-400 rounded-full flex items-center justify-end pr-2 transition-all duration-1000" data-target-width="72%" style="width:0%">
+                                        <span class="text-[10px] text-white font-bold">38 kWh</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="text-xs text-gray-400 w-8">Tue</span>
+                                <div class="flex-1 h-7 bg-gray-800 rounded-full overflow-hidden">
+                                    <div class="h-full bg-gradient-to-r from-blue-600 to-blue-400 rounded-full flex items-center justify-end pr-2 transition-all duration-1000" data-target-width="56%" style="width:0%">
+                                        <span class="text-[10px] text-white font-bold">29 kWh</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="text-xs text-gray-400 w-8">Wed</span>
+                                <div class="flex-1 h-7 bg-gray-800 rounded-full overflow-hidden">
+                                    <div class="h-full bg-gradient-to-r from-blue-600 to-blue-400 rounded-full flex items-center justify-end pr-2 transition-all duration-1000" data-target-width="88%" style="width:0%">
+                                        <span class="text-[10px] text-white font-bold">46 kWh</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="text-xs text-gray-400 w-8">Thu</span>
+                                <div class="flex-1 h-7 bg-gray-800 rounded-full overflow-hidden">
+                                    <div class="h-full bg-gradient-to-r from-blue-600 to-blue-400 rounded-full flex items-center justify-end pr-2 transition-all duration-1000" data-target-width="42%" style="width:0%">
+                                        <span class="text-[10px] text-white font-bold">22 kWh</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="text-xs text-gray-400 w-8">Fri</span>
+                                <div class="flex-1 h-7 bg-gray-800 rounded-full overflow-hidden">
+                                    <div class="h-full bg-gradient-to-r from-blue-600 to-blue-400 rounded-full flex items-center justify-end pr-2 transition-all duration-1000" data-target-width="65%" style="width:0%">
+                                        <span class="text-[10px] text-white font-bold">34 kWh</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="text-xs text-gray-400 w-8">Sat</span>
+                                <div class="flex-1 h-7 bg-gray-800 rounded-full overflow-hidden">
+                                    <div class="h-full bg-gradient-to-r from-pagani-gold to-bright-gold rounded-full flex items-center justify-end pr-2 transition-all duration-1000" data-target-width="95%" style="width:0%">
+                                        <span class="text-[10px] text-black font-bold">50 kWh</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="text-xs text-pagani-gold w-8 font-bold">Sun</span>
+                                <div class="flex-1 h-7 bg-gray-800 rounded-full overflow-hidden">
+                                    <div class="h-full bg-gradient-to-r from-green-600 to-green-400 rounded-full flex items-center justify-end pr-2 transition-all duration-1000" data-target-width="34%" style="width:0%">
+                                        <span class="text-[10px] text-white font-bold">18 kWh</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="flex items-center gap-2">
-                            <div class="w-4 h-4 bg-orange-500 rounded"></div>
-                            <span>Degraded (75-84%)</span>
+                        <div class="mt-4 flex items-center justify-between text-xs">
+                            <span class="text-gray-400">Weekly total: <span class="text-white font-bold">237 kWh</span></span>
+                            <span class="text-green-400"><i class="fa-solid fa-arrow-down mr-1"></i>12% vs last week</span>
                         </div>
-                        <div class="flex items-center gap-2">
-                            <div class="w-4 h-4 bg-red-500 rounded"></div>
-                            <span>Critical (&lt;75%)</span>
+                    </div>
+
+                    <!-- Charging Distribution -->
+                    <div class="bg-gradient-to-br from-gray-900 to-pagani-black border border-pagani-gold/20 rounded-xl p-6 fade-in-section" style="animation-delay: 150ms">
+                        <h3 class="text-lg font-orbitron font-bold mb-6 flex items-center gap-3">
+                            <i class="fa-solid fa-chart-pie text-pagani-gold"></i>
+                            Charging Distribution
+                        </h3>
+                        <div class="flex items-center gap-8">
+                            <!-- Donut Chart -->
+                            <div class="relative w-40 h-40 flex-shrink-0">
+                                <svg viewBox="0 0 120 120" class="w-full h-full -rotate-90">
+                                    <circle cx="60" cy="60" r="50" fill="none" stroke="#1f2937" stroke-width="16"/>
+                                    <!-- DC Fast: 45% -->
+                                    <circle id="donut-dc" cx="60" cy="60" r="50" fill="none" stroke="#eab308" stroke-width="16" stroke-dasharray="0 314.16" stroke-dashoffset="0" class="transition-all duration-1000" data-target-dash="141.37 314.16"/>
+                                    <!-- Home AC: 35% -->
+                                    <circle id="donut-home" cx="60" cy="60" r="50" fill="none" stroke="#3b82f6" stroke-width="16" stroke-dasharray="0 314.16" stroke-dashoffset="-141.37" class="transition-all duration-1000" data-target-dash="109.96 314.16"/>
+                                    <!-- Public AC: 20% -->
+                                    <circle id="donut-public" cx="60" cy="60" r="50" fill="none" stroke="#22c55e" stroke-width="16" stroke-dasharray="0 314.16" stroke-dashoffset="-251.33" class="transition-all duration-1000" data-target-dash="62.83 314.16"/>
+                                </svg>
+                                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                                    <p class="text-2xl font-orbitron font-bold text-pagani-gold">245</p>
+                                    <p class="text-[10px] text-gray-400">sessions</p>
+                                </div>
+                            </div>
+                            <!-- Legend -->
+                            <div class="flex-1 space-y-4">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                                        <span class="text-sm text-gray-300">DC Fast Charging</span>
+                                    </div>
+                                    <div class="text-right">
+                                        <span class="text-sm font-orbitron font-bold text-yellow-400">45%</span>
+                                        <p class="text-[10px] text-gray-500">110 sessions</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-3 h-3 rounded-full bg-blue-500"></div>
+                                        <span class="text-sm text-gray-300">Home AC</span>
+                                    </div>
+                                    <div class="text-right">
+                                        <span class="text-sm font-orbitron font-bold text-blue-400">35%</span>
+                                        <p class="text-[10px] text-gray-500">86 sessions</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                                        <span class="text-sm text-gray-300">Public AC</span>
+                                    </div>
+                                    <div class="text-right">
+                                        <span class="text-sm font-orbitron font-bold text-green-400">20%</span>
+                                        <p class="text-[10px] text-gray-500">49 sessions</p>
+                                    </div>
+                                </div>
+                                <div class="pt-3 border-t border-gray-700">
+                                    <div class="flex items-center justify-between text-xs">
+                                        <span class="text-gray-400">Avg session cost</span>
+                                        <span class="text-pagani-gold font-bold">₹285</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Voltage & Temperature Trends -->
+                    <div class="bg-gradient-to-br from-gray-900 to-pagani-black border border-pagani-gold/20 rounded-xl p-6 fade-in-section" style="animation-delay: 200ms">
+                        <h3 class="text-lg font-orbitron font-bold mb-6 flex items-center gap-3">
+                            <i class="fa-solid fa-wave-square text-pagani-gold"></i>
+                            Voltage & Temperature Trends
+                        </h3>
+                        <!-- Voltage sparkline -->
+                        <div class="mb-5">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs text-gray-400 flex items-center gap-1"><i class="fa-solid fa-bolt text-yellow-400"></i>Pack Voltage</span>
+                                <span class="text-xs font-orbitron text-yellow-400">396V</span>
+                            </div>
+                            <div class="relative h-16 bg-gray-800/50 rounded-lg overflow-hidden" id="voltage-sparkline">
+                                <svg viewBox="0 0 300 60" class="w-full h-full" preserveAspectRatio="none">
+                                    <defs>
+                                        <linearGradient id="voltGrad" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stop-color="#eab308" stop-opacity="0.4"/>
+                                            <stop offset="100%" stop-color="#eab308" stop-opacity="0"/>
+                                        </linearGradient>
+                                    </defs>
+                                    <path d="M0,30 Q15,28 30,25 T60,22 T90,28 T120,20 T150,24 T180,18 T210,22 T240,15 T270,18 T300,12" fill="url(#voltGrad)" stroke="none" opacity="0.5"/>
+                                    <path id="volt-line" d="M0,30 Q15,28 30,25 T60,22 T90,28 T120,20 T150,24 T180,18 T210,22 T240,15 T270,18 T300,12" fill="none" stroke="#eab308" stroke-width="2" stroke-dasharray="500" stroke-dashoffset="500" class="transition-all duration-2000"/>
+                                    <circle id="volt-dot" cx="300" cy="12" r="3" fill="#eab308" opacity="0" class="transition-all duration-500"/>
+                                </svg>
+                                <div class="absolute left-2 bottom-1 flex gap-4 text-[9px] text-gray-600">
+                                    <span>6h ago</span><span>4h</span><span>2h</span><span>Now</span>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Temperature sparkline -->
+                        <div class="mb-5">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs text-gray-400 flex items-center gap-1"><i class="fa-solid fa-temperature-half text-orange-400"></i>Battery Temperature</span>
+                                <span class="text-xs font-orbitron text-orange-400">32°C</span>
+                            </div>
+                            <div class="relative h-16 bg-gray-800/50 rounded-lg overflow-hidden">
+                                <svg viewBox="0 0 300 60" class="w-full h-full" preserveAspectRatio="none">
+                                    <defs>
+                                        <linearGradient id="tempGrad" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stop-color="#f97316" stop-opacity="0.4"/>
+                                            <stop offset="100%" stop-color="#f97316" stop-opacity="0"/>
+                                        </linearGradient>
+                                    </defs>
+                                    <path d="M0,40 Q15,38 30,35 T60,38 T90,30 T120,35 T150,28 T180,32 T210,25 T240,28 T270,22 T300,20" fill="url(#tempGrad)" stroke="none" opacity="0.5"/>
+                                    <path id="temp-line" d="M0,40 Q15,38 30,35 T60,38 T90,30 T120,35 T150,28 T180,32 T210,25 T240,28 T270,22 T300,20" fill="none" stroke="#f97316" stroke-width="2" stroke-dasharray="500" stroke-dashoffset="500" class="transition-all duration-2000"/>
+                                    <circle id="temp-dot" cx="300" cy="20" r="3" fill="#f97316" opacity="0" class="transition-all duration-500"/>
+                                </svg>
+                                <div class="absolute left-2 bottom-1 flex gap-4 text-[9px] text-gray-600">
+                                    <span>6h ago</span><span>4h</span><span>2h</span><span>Now</span>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Efficiency gauge -->
+                        <div class="flex items-center gap-4 p-3 bg-pagani-black/50 rounded-lg border border-pagani-gold/10">
+                            <div class="relative w-14 h-14 flex-shrink-0">
+                                <svg viewBox="0 0 60 60" class="w-full h-full -rotate-90">
+                                    <circle cx="30" cy="30" r="24" fill="none" stroke="#1f2937" stroke-width="6"/>
+                                    <circle id="efficiency-ring" cx="30" cy="30" r="24" fill="none" stroke="#22c55e" stroke-width="6" stroke-dasharray="0 150.8" stroke-linecap="round" class="transition-all duration-1000" data-target-dash="131.9 150.8"/>
+                                </svg>
+                                <div class="absolute inset-0 flex items-center justify-center">
+                                    <span class="text-xs font-orbitron font-bold text-green-400">87%</span>
+                                </div>
+                            </div>
+                            <div>
+                                <p class="text-sm font-semibold text-white">Charging Efficiency</p>
+                                <p class="text-xs text-gray-400">156 Wh/km average · <span class="text-green-400">Excellent</span></p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -339,26 +586,8 @@ export async function renderBatteryPage() {
 }
 
 function initializeBatteryPage() {
-    // Populate cell grid
-    const cellGrid = document.getElementById('cell-grid');
-    if (cellGrid) {
-        const cells = generateCellData(96); // Typical EV battery has many cells
-        cellGrid.innerHTML = cells.map(cell => {
-            const healthColor = cell.health >= 95 ? 'bg-green-500' :
-                               cell.health >= 85 ? 'bg-yellow-500' :
-                               cell.health >= 75 ? 'bg-orange-500' : 'bg-red-500';
-            return `
-                <div class="cell-item group relative">
-                    <div class="w-full aspect-square ${healthColor} rounded-lg opacity-80 hover:opacity-100 cursor-pointer transition-all hover:scale-110 hover:z-10"></div>
-                    <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-pagani-black border border-pagani-gold/30 rounded px-2 py-1 whitespace-nowrap z-20">
-                        <p class="text-xs text-gray-400">Cell ${cell.id}</p>
-                        <p class="text-xs text-white">${cell.voltage}V | ${cell.temperature}°C</p>
-                        <p class="text-xs ${healthColor.replace('bg-', 'text-')}">${cell.health}% Health</p>
-                    </div>
-                </div>
-            `;
-        }).join('');
-    }
+    // Animate charts
+    animateCharts();
 
     // Populate charging history
     const chargingHistory = document.getElementById('charging-history');
@@ -403,21 +632,49 @@ function initializeBatteryPage() {
     startRealTimeUpdates();
 }
 
-function generateCellData(count: number): BatteryCell[] {
-    const cells: BatteryCell[] = [];
-    for (let i = 1; i <= count; i++) {
-        cells.push({
-            id: i,
-            voltage: 3.6 + Math.random() * 0.5,
-            temperature: 28 + Math.random() * 10,
-            health: 85 + Math.random() * 15
+function animateCharts() {
+    // Animate SoH bar chart
+    document.querySelectorAll('#soh-chart [data-target-height]').forEach((el, i) => {
+        setTimeout(() => {
+            (el as HTMLElement).style.height = (el as HTMLElement).dataset.targetHeight!;
+        }, 100 + i * 80);
+    });
+
+    // Animate energy consumption bars
+    document.querySelectorAll('#energy-bars [data-target-width]').forEach((el, i) => {
+        setTimeout(() => {
+            (el as HTMLElement).style.width = (el as HTMLElement).dataset.targetWidth!;
+        }, 200 + i * 100);
+    });
+
+    // Animate donut chart segments
+    setTimeout(() => {
+        ['donut-dc', 'donut-home', 'donut-public'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.setAttribute('stroke-dasharray', el.dataset.targetDash!);
         });
-    }
-    // Add a few cells with lower health for demonstration
-    cells[23].health = 78;
-    cells[45].health = 82;
-    cells[67].health = 72;
-    return cells;
+    }, 400);
+
+    // Animate sparklines
+    setTimeout(() => {
+        const voltLine = document.getElementById('volt-line');
+        const tempLine = document.getElementById('temp-line');
+        if (voltLine) voltLine.style.strokeDashoffset = '0';
+        if (tempLine) tempLine.style.strokeDashoffset = '0';
+
+        setTimeout(() => {
+            const voltDot = document.getElementById('volt-dot');
+            const tempDot = document.getElementById('temp-dot');
+            if (voltDot) voltDot.setAttribute('opacity', '1');
+            if (tempDot) tempDot.setAttribute('opacity', '1');
+        }, 1500);
+    }, 600);
+
+    // Animate efficiency ring
+    setTimeout(() => {
+        const ring = document.getElementById('efficiency-ring');
+        if (ring) ring.setAttribute('stroke-dasharray', ring.dataset.targetDash!);
+    }, 800);
 }
 
 function startRealTimeUpdates() {

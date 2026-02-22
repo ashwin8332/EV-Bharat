@@ -445,6 +445,34 @@ app.post('/api/contact', async (req, res) => {
   }
 });
 
+// ── GET /api/weather – proxy OpenWeatherMap API ──
+app.get('/api/weather', async (req, res) => {
+  const { lat, lng } = req.query;
+
+  if (!lat || !lng) {
+    return res.status(400).json({ success: false, message: 'lat and lng query params required.' });
+  }
+
+  const owmKey = process.env.OPENWEATHER_API_KEY || '14e25445add5aa8b53cc4f2434532e59';
+
+  try {
+    const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&appid=${owmKey}&units=metric`;
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => '');
+      console.error('OpenWeatherMap error:', response.status, errText);
+      return res.status(502).json({ success: false, message: 'Weather service unavailable.' });
+    }
+
+    const weather = await response.json();
+    return res.json({ success: true, weather });
+  } catch (error) {
+    console.error('Weather fetch error:', error);
+    return res.status(500).json({ success: false, message: 'Server error.' });
+  }
+});
+
 app.use((err, _req, res, _next) => {
   console.error('Unhandled error:', err);
   res.status(500).json({ success: false, message: 'Server error.' });
