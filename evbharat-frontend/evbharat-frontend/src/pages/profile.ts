@@ -438,6 +438,62 @@ function initializeProfilePage() {
     
     // Avatar change handler
     setupAvatarHandler();
+
+    // Load saved profile data from backend
+    loadProfileData();
+}
+
+async function loadProfileData() {
+    const result = await authService.fetchProfile();
+    if (!result.success || !result.data) return;
+
+    const { profile, preferences, vehicle } = result.data;
+
+    // Personal fields
+    const setVal = (id: string, val: string | undefined | null) => {
+        const el = document.getElementById(id) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
+        if (el && val) el.value = val;
+    };
+
+    if (profile) {
+        setVal('phone', profile.phone);
+        setVal('dateOfBirth', profile.date_of_birth);
+        setVal('address', profile.address);
+        setVal('city', profile.city);
+        setVal('state', profile.state);
+    }
+
+    // Preferences
+    if (preferences) {
+        const setChecked = (id: string, val: boolean) => {
+            const el = document.getElementById(id) as HTMLInputElement | null;
+            if (el) el.checked = val;
+        };
+        setChecked('emailNotifications', preferences.emailNotifications);
+        setChecked('batteryAlerts', preferences.batteryAlerts);
+        setChecked('maintenanceAlerts', preferences.maintenanceAlerts);
+        setChecked('twoFactor', preferences.twoFactorEnabled);
+        setVal('distanceUnit', preferences.distanceUnit);
+        setVal('temperatureUnit', preferences.temperatureUnit);
+        setVal('language', preferences.language);
+    }
+
+    // Vehicle
+    if (vehicle) {
+        setVal('vehicleMake', vehicle.make);
+        setVal('vehicleModel', vehicle.model);
+        setVal('vehicleYear', vehicle.year?.toString());
+        setVal('batteryCapacity', vehicle.batteryCapacity?.toString());
+        setVal('range', vehicle.rangeKm?.toString());
+        setVal('vehicleNotes', vehicle.notes);
+
+        if (Array.isArray(vehicle.chargingTypes)) {
+            vehicle.chargingTypes.forEach((type: string) => {
+                const cb = document.querySelector<HTMLInputElement>(`input[name="chargingType"][value="${type}"]`);
+                if (cb) cb.checked = true;
+            });
+        }
+    }
 }
 
 function setupFormHandlers(personalValidator: FormValidator, securityValidator: FormValidator) {
@@ -457,25 +513,25 @@ function setupFormHandlers(personalValidator: FormValidator, securityValidator: 
         showMessage('Processing...', 'info');
         
         try {
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            // Update user info
-            const updatedUser = {
-                ...authService.getCurrentUser()!,
-                name: `${formData.get('firstName')} ${formData.get('lastName')}`,
-                email: formData.get('email') as string
-            };
-            
-            // Update local storage (in real app, this would be API call)
-            localStorage.setItem('evbharat_user', JSON.stringify(updatedUser));
-            
-            showMessage('Personal information updated successfully!', 'success');
-            
-            // Update navbar if needed
-            setTimeout(() => window.location.reload(), 1500);
-            
-        } catch (error) {
+            const result = await authService.updateProfile({
+                firstName: formData.get('firstName') as string,
+                lastName: formData.get('lastName') as string,
+                email: formData.get('email') as string,
+                phone: formData.get('phone') as string,
+                dateOfBirth: formData.get('dateOfBirth') as string,
+                address: formData.get('address') as string,
+                city: formData.get('city') as string,
+                state: formData.get('state') as string
+            });
+
+            if (result.success) {
+                showMessage(result.message, 'success');
+                // Refresh page to reflect updated name/email in navbar
+                setTimeout(() => window.location.reload(), 1500);
+            } else {
+                showMessage(result.message, 'error');
+            }
+        } catch {
             showMessage('Failed to update information. Please try again.', 'error');
         }
     });
@@ -493,6 +549,7 @@ function setupFormHandlers(personalValidator: FormValidator, securityValidator: 
             return;
         }
 
+        const currentPassword = formData.get('currentPassword') as string;
         const newPassword = formData.get('newPassword') as string;
         const confirmPassword = formData.get('confirmPassword') as string;
         
@@ -504,11 +561,14 @@ function setupFormHandlers(personalValidator: FormValidator, securityValidator: 
         showMessage('Updating security settings...', 'info');
         
         try {
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            showMessage('Security settings updated successfully!', 'success');
-            securityForm.reset();
-        } catch (error) {
+            const result = await authService.updatePassword(currentPassword, newPassword);
+            if (result.success) {
+                showMessage(result.message, 'success');
+                securityForm.reset();
+            } else {
+                showMessage(result.message, 'error');
+            }
+        } catch {
             showMessage('Failed to update security settings. Please try again.', 'error');
         }
     });
@@ -520,9 +580,22 @@ function setupFormHandlers(personalValidator: FormValidator, securityValidator: 
         showMessage('Saving preferences...', 'info');
         
         try {
-            await new Promise(resolve => setTimeout(resolve, 800));
-            showMessage('Preferences saved successfully!', 'success');
-        } catch (error) {
+            const result = await authService.updatePreferences({
+                emailNotifications: (document.getElementById('emailNotifications') as HTMLInputElement)?.checked ?? true,
+                batteryAlerts: (document.getElementById('batteryAlerts') as HTMLInputElement)?.checked ?? true,
+                maintenanceAlerts: (document.getElementById('maintenanceAlerts') as HTMLInputElement)?.checked ?? true,
+                distanceUnit: (document.getElementById('distanceUnit') as HTMLSelectElement)?.value ?? 'km',
+                temperatureUnit: (document.getElementById('temperatureUnit') as HTMLSelectElement)?.value ?? 'celsius',
+                language: (document.getElementById('language') as HTMLSelectElement)?.value ?? 'en',
+                twoFactorEnabled: (document.getElementById('twoFactor') as HTMLInputElement)?.checked ?? false
+            });
+
+            if (result.success) {
+                showMessage(result.message, 'success');
+            } else {
+                showMessage(result.message, 'error');
+            }
+        } catch {
             showMessage('Failed to save preferences. Please try again.', 'error');
         }
     });
@@ -534,9 +607,25 @@ function setupFormHandlers(personalValidator: FormValidator, securityValidator: 
         showMessage('Saving vehicle information...', 'info');
         
         try {
-            await new Promise(resolve => setTimeout(resolve, 800));
-            showMessage('Vehicle information saved successfully!', 'success');
-        } catch (error) {
+            const chargingCheckboxes = vehicleForm.querySelectorAll<HTMLInputElement>('input[name="chargingType"]:checked');
+            const chargingTypes = Array.from(chargingCheckboxes).map(cb => cb.value);
+
+            const result = await authService.updateVehicle({
+                make: (document.getElementById('vehicleMake') as HTMLSelectElement)?.value ?? '',
+                model: (document.getElementById('vehicleModel') as HTMLInputElement)?.value ?? '',
+                year: parseInt((document.getElementById('vehicleYear') as HTMLSelectElement)?.value) || null,
+                batteryCapacity: parseFloat((document.getElementById('batteryCapacity') as HTMLInputElement)?.value) || null,
+                rangeKm: parseFloat((document.getElementById('range') as HTMLInputElement)?.value) || null,
+                chargingTypes,
+                notes: (document.getElementById('vehicleNotes') as HTMLTextAreaElement)?.value ?? ''
+            });
+
+            if (result.success) {
+                showMessage(result.message, 'success');
+            } else {
+                showMessage(result.message, 'error');
+            }
+        } catch {
             showMessage('Failed to save vehicle information. Please try again.', 'error');
         }
     });

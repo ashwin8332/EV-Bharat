@@ -165,37 +165,63 @@ class AuthService {
     }
 
     /**
+     * Authenticated API request helper
+     */
+    private async authFetch(path: string, method: 'GET' | 'PUT' | 'POST' = 'GET', body?: Record<string, unknown>): Promise<{ ok: boolean; data: any }> {
+        const { token } = this.getAuthState();
+        if (!token) return { ok: false, data: { message: 'Not authenticated.' } };
+
+        const opts: RequestInit = {
+            method,
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`
+            }
+        };
+        if (body) opts.body = JSON.stringify(body);
+
+        const res = await fetch(`${this.apiBase}${path}`, opts);
+        const data = await res.json().catch(() => ({}));
+        return { ok: res.ok, data };
+    }
+
+    /**
+     * Fetch full profile from backend
+     */
+    public async fetchProfile(): Promise<{ success: boolean; data?: any; message?: string }> {
+        try {
+            const { ok, data } = await this.authFetch('/api/profile');
+            if (!ok) return { success: false, message: data?.message ?? 'Failed to load profile.' };
+            return { success: true, data: data.data };
+        } catch {
+            return { success: false, message: 'Network error.' };
+        }
+    }
+
+    /**
      * Update user profile information
      */
-    public async updateProfile(profileData: Partial<User>): Promise<AuthResult> {
-        const currentUser = this.getCurrentUser();
-        if (!currentUser) {
-            return {
-                success: false,
-                message: 'User not authenticated'
-            };
+    public async updateProfile(profileData: Record<string, unknown>): Promise<AuthResult> {
+        if (!this.isAuthenticated()) {
+            return { success: false, message: 'User not authenticated' };
         }
 
         try {
-            // In a real app, this would be an API call
-            // For demo purposes, we'll simulate the update
-            const updatedUser: User = {
-                ...currentUser,
-                ...profileData
-            };
+            const { ok, data } = await this.authFetch('/api/profile/personal', 'PUT', profileData);
 
-            this.persistAuth(this.getAuthState().token!, updatedUser);
-            
-            return {
-                success: true,
-                message: 'Profile updated successfully',
-                user: updatedUser
-            };
-        } catch (error) {
-            return {
-                success: false,
-                message: 'Failed to update profile. Please try again.'
-            };
+            if (!ok) {
+                return { success: false, message: data?.message ?? 'Failed to update profile.' };
+            }
+
+            // Sync local storage with updated user & (optional) new token
+            if (data?.user) {
+                const token = data.token ?? this.getAuthState().token!;
+                this.persistAuth(token, data.user);
+            }
+
+            return { success: true, message: data?.message ?? 'Profile updated successfully', user: data?.user };
+        } catch {
+            return { success: false, message: 'Network error. Please try again.' };
         }
     }
 
@@ -204,26 +230,49 @@ class AuthService {
      */
     public async updatePassword(currentPassword: string, newPassword: string): Promise<AuthResult> {
         if (!this.isAuthenticated()) {
-            return {
-                success: false,
-                message: 'User not authenticated'
-            };
+            return { success: false, message: 'User not authenticated' };
         }
 
         try {
-            // In a real app, this would verify the current password and update it
-            // For demo purposes, we'll just simulate success
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            return {
-                success: true,
-                message: 'Password updated successfully'
-            };
-        } catch (error) {
-            return {
-                success: false,
-                message: 'Failed to update password. Please try again.'
-            };
+            const { ok, data } = await this.authFetch('/api/profile/password', 'PUT', { currentPassword, newPassword });
+
+            if (!ok) {
+                return { success: false, message: data?.message ?? 'Failed to update password.' };
+            }
+
+            return { success: true, message: data?.message ?? 'Password updated successfully' };
+        } catch {
+            return { success: false, message: 'Network error. Please try again.' };
+        }
+    }
+
+    /**
+     * Update preferences
+     */
+    public async updatePreferences(prefs: Record<string, unknown>): Promise<AuthResult> {
+        if (!this.isAuthenticated()) return { success: false, message: 'Not authenticated' };
+
+        try {
+            const { ok, data } = await this.authFetch('/api/profile/preferences', 'PUT', prefs);
+            if (!ok) return { success: false, message: data?.message ?? 'Failed to save preferences.' };
+            return { success: true, message: data?.message ?? 'Preferences saved.' };
+        } catch {
+            return { success: false, message: 'Network error.' };
+        }
+    }
+
+    /**
+     * Update vehicle info
+     */
+    public async updateVehicle(vehicle: Record<string, unknown>): Promise<AuthResult> {
+        if (!this.isAuthenticated()) return { success: false, message: 'Not authenticated' };
+
+        try {
+            const { ok, data } = await this.authFetch('/api/profile/vehicle', 'PUT', vehicle);
+            if (!ok) return { success: false, message: data?.message ?? 'Failed to save vehicle.' };
+            return { success: true, message: data?.message ?? 'Vehicle info saved.' };
+        } catch {
+            return { success: false, message: 'Network error.' };
         }
     }
 }
