@@ -15,6 +15,7 @@ import { renderBatteryAnalyticsPage } from './pages/battery-analytics';
 import { renderRAGChatPage } from './pages/rag-chat';
 import { renderMapPage } from './pages/map';
 import { renderAlertPage } from './pages/alerts';
+import { renderProfilePage } from './pages/profile';
 import { render404Page } from './pages/404';
 
 // Initialize loader
@@ -38,6 +39,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     router.register('/rag-chat', 'AI Assistant | EVBharat', renderRAGChatPage);
     router.register('/map', 'Route Planner | EVBharat', renderMapPage);
     router.register('/alerts', 'Alerts | EVBharat', renderAlertPage);
+    router.register('/profile', 'Profile | EVBharat', renderProfilePage);
     router.register('/404', '404 Not Found | EVBharat', render404Page);
 
     // Initialize router

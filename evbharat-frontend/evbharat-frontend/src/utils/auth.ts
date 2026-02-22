@@ -4,6 +4,32 @@ export interface User {
     email: string;
     name: string;
     role: string;
+    phone?: string;
+    dateOfBirth?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    avatar?: string;
+    preferences?: {
+        notifications: {
+            email: boolean;
+            battery: boolean;
+            maintenance: boolean;
+        };
+        units: {
+            distance: 'km' | 'miles';
+            temperature: 'celsius' | 'fahrenheit';
+        };
+        language: string;
+    };
+    vehicle?: {
+        make: string;
+        model: string;
+        year: number;
+        batteryCapacity: number;
+        range: number;
+        chargingTypes: string[];
+    };
 }
 
 export interface AuthState {
@@ -134,6 +160,69 @@ class AuthService {
             return {
                 success: false,
                 message: 'Network error. Please try again.'
+            };
+        }
+    }
+
+    /**
+     * Update user profile information
+     */
+    public async updateProfile(profileData: Partial<User>): Promise<AuthResult> {
+        const currentUser = this.getCurrentUser();
+        if (!currentUser) {
+            return {
+                success: false,
+                message: 'User not authenticated'
+            };
+        }
+
+        try {
+            // In a real app, this would be an API call
+            // For demo purposes, we'll simulate the update
+            const updatedUser: User = {
+                ...currentUser,
+                ...profileData
+            };
+
+            this.persistAuth(this.getAuthState().token!, updatedUser);
+            
+            return {
+                success: true,
+                message: 'Profile updated successfully',
+                user: updatedUser
+            };
+        } catch (error) {
+            return {
+                success: false,
+                message: 'Failed to update profile. Please try again.'
+            };
+        }
+    }
+
+    /**
+     * Update user password
+     */
+    public async updatePassword(currentPassword: string, newPassword: string): Promise<AuthResult> {
+        if (!this.isAuthenticated()) {
+            return {
+                success: false,
+                message: 'User not authenticated'
+            };
+        }
+
+        try {
+            // In a real app, this would verify the current password and update it
+            // For demo purposes, we'll just simulate success
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            return {
+                success: true,
+                message: 'Password updated successfully'
+            };
+        } catch (error) {
+            return {
+                success: false,
+                message: 'Failed to update password. Please try again.'
             };
         }
     }

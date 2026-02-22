@@ -333,3 +333,146 @@ button[type="submit"]:before {
 button[type="submit"]:hover:before {
   left: 100%;
 }
+
+/* Profile Page Styles */
+.profile-tab {
+  @apply px-4 py-3 text-sm font-medium text-gray-400 border-b-2 border-transparent hover:text-pagani-gold hover:border-pagani-gold/50 transition-all duration-300 flex items-center;
+}
+
+.profile-tab.active {
+  @apply text-pagani-gold border-pagani-gold;
+}
+
+.form-group {
+  @apply space-y-2;
+}
+
+.form-label {
+  @apply block text-sm font-medium text-gray-300;
+}
+
+.form-input {
+  @apply w-full px-4 py-3 bg-pagani-black/40 border border-pagani-gold/30 rounded-lg text-white placeholder-gray-400 focus:border-pagani-gold focus:ring-2 focus:ring-pagani-gold/20 focus:outline-none transition-all duration-300;
+}
+
+.form-input:focus {
+  @apply shadow-lg shadow-pagani-gold/10;
+}
+
+.btn-primary {
+  @apply px-6 py-3 bg-gradient-to-r from-pagani-gold to-yellow-500 text-black font-medium rounded-lg hover:from-yellow-500 hover:to-pagani-gold transform hover:scale-105 transition-all duration-300 flex items-center justify-center;
+}
+
+.btn-primary:hover {
+  @apply shadow-xl shadow-pagani-gold/30;
+}
+
+/* Toggle Switch Styles */
+.toggle-switch {
+  @apply relative inline-block w-12 h-6;
+}
+
+.toggle-switch input {
+  @apply opacity-0 w-0 h-0;
+}
+
+.toggle-slider {
+  @apply absolute cursor-pointer top-0 left-0 right-0 bottom-0 bg-gray-600 rounded-full transition-all duration-300;
+}
+
+.toggle-slider:before {
+  @apply absolute content-[''] h-4 w-4 left-1 bottom-1 bg-white rounded-full transition-all duration-300;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  @apply bg-pagani-gold;
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+  @apply transform translate-x-6;
+}
+
+/* Charging Option Styles */
+.charging-option {
+  @apply cursor-pointer;
+}
+
+.charging-option input {
+  @apply hidden;
+}
+
+.charging-card {
+  @apply p-4 border border-pagani-gold/30 rounded-lg text-center transition-all duration-300 hover:border-pagani-gold hover:bg-pagani-gold/10;
+}
+
+.charging-option input:checked + .charging-card {
+  @apply border-pagani-gold bg-pagani-gold/20;
+}
+
+/* Tab Content Transitions */
+.tab-content {
+  @apply transition-all duration-300;
+}
+
+.tab-content.active {
+  @apply opacity-100;
+}
+
+.tab-content.hidden {
+  @apply opacity-0;
+}
+
+/* Profile Avatar Animation */
+.profile-avatar {
+  @apply relative;
+}
+
+.profile-avatar::before {
+  @apply content-[''] absolute inset-0 rounded-full bg-gradient-to-r from-pagani-gold/50 to-transparent opacity-0 scale-110 transition-all duration-500;
+}
+
+.profile-avatar:hover::before {
+  @apply opacity-100 scale-100 animate-pulse;
+}
+
+/* Message Styles */
+.message-success {
+  @apply bg-green-500/20 border border-green-500/30 text-green-400 p-4 rounded-lg mb-6;
+}
+
+.message-error {
+  @apply bg-red-500/20 border border-red-500/30 text-red-400 p-4 rounded-lg mb-6;
+}
+
+.message-info {
+  @apply bg-blue-500/20 border border-blue-500/30 text-blue-400 p-4 rounded-lg mb-6;
+}
+
+/* Form Validation Styles */
+.form-input.error {
+  @apply border-red-500 focus:border-red-500 focus:ring-red-500/20;
+}
+
+.form-input.success {
+  @apply border-green-500 focus:border-green-500 focus:ring-green-500/20;
+}
+
+/* Responsive Profile Grid */
+@media (max-width: 1024px) {
+  .profile-tab {
+    @apply text-xs px-3 py-2;
+  }
+  
+  .form-input {
+    @apply py-2 text-sm;
+  }
+}
+
+/* Loading State */
+.loading {
+  @apply opacity-50 pointer-events-none;
+}
+
+.loading .btn-primary {
+  @apply animate-pulse;
+}

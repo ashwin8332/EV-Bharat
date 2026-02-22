@@ -15,112 +15,132 @@ export class Navbar {
         const user = authService.getCurrentUser();
         
         const navbarHTML = `
-            <nav class="fixed top-0 left-0 w-full z-50 px-4 md:px-8 py-4 md:py-6 transition-all duration-300" id="navbar">
-                <div class="max-w-7xl mx-auto flex justify-between items-center">
-                    <!-- Logo -->
-                    <a href="/" class="text-xl md:text-2xl font-bold tracking-widest text-white uppercase font-orbitron hover:text-pagani-gold transition-colors">
-                        EV<span class="text-pagani-gold">BHARAT</span>
-                    </a>
-
-                    <!-- Desktop Navigation -->
-                    <div class="hidden md:flex items-center gap-8">
-                        <a href="/" class="nav-link text-sm tracking-wider uppercase hover:text-pagani-gold transition-colors">Home</a>
-                        <a href="/about" class="nav-link text-sm tracking-wider uppercase hover:text-pagani-gold transition-colors">About</a>
-                        <a href="/technology" class="nav-link text-sm tracking-wider uppercase hover:text-pagani-gold transition-colors">Technology</a>
-                        <a href="/gallery" class="nav-link text-sm tracking-wider uppercase hover:text-pagani-gold transition-colors">Gallery</a>
-                        <a href="/contact" class="nav-link text-sm tracking-wider uppercase hover:text-pagani-gold transition-colors">Contact</a>
-                        ${isAuthenticated ? `
-                        <div class="relative group">
-                            <button class="nav-link text-sm tracking-wider uppercase hover:text-pagani-gold transition-colors flex items-center gap-1">
-                                <i class="fa-solid fa-gauge-high text-xs"></i> Dashboard <i class="fa-solid fa-chevron-down text-xs"></i>
-                            </button>
-                            <div class="absolute top-full left-0 mt-2 w-56 bg-pagani-black/95 backdrop-blur-lg border border-pagani-gold/30 rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 shadow-xl">
-                                <a href="/dashboard" class="flex items-center gap-3 px-4 py-3 text-sm hover:bg-pagani-gold/20 hover:text-pagani-gold transition-all border-b border-pagani-gold/10">
-                                    <i class="fa-solid fa-gauge-high w-5"></i> Dashboard
-                                </a>
-                                <a href="/battery" class="flex items-center gap-3 px-4 py-3 text-sm hover:bg-pagani-gold/20 hover:text-pagani-gold transition-all border-b border-pagani-gold/10">
-                                    <i class="fa-solid fa-car-battery w-5"></i> Battery Health
-                                </a>
-                                <a href="/rag-chat" class="flex items-center gap-3 px-4 py-3 text-sm hover:bg-pagani-gold/20 hover:text-pagani-gold transition-all border-b border-pagani-gold/10">
-                                    <i class="fa-solid fa-robot w-5"></i> AI Assistant
-                                </a>
-                                <a href="/map" class="flex items-center gap-3 px-4 py-3 text-sm hover:bg-pagani-gold/20 hover:text-pagani-gold transition-all border-b border-pagani-gold/10">
-                                    <i class="fa-solid fa-route w-5"></i> Route Planner
-                                </a>
-                                <a href="/alerts" class="flex items-center gap-3 px-4 py-3 text-sm hover:bg-pagani-gold/20 hover:text-pagani-gold transition-all">
-                                    <i class="fa-solid fa-bell w-5"></i> Alerts
-                                </a>
-                            </div>
+            <nav class="fixed top-0 left-0 w-full z-50 px-4 md:px-8 py-3 md:py-4 transition-all duration-300" id="navbar">
+                <div class="max-w-7xl mx-auto">
+                    <div class="flex items-center justify-between">
+                        <!-- Logo -->
+                        <div class="flex-shrink-0 z-10">
+                            <a href="/" class="text-lg md:text-xl lg:text-2xl font-bold tracking-widest text-white uppercase font-orbitron hover:text-pagani-gold transition-colors">
+                                EV<span class="text-pagani-gold">BHARAT</span>
+                            </a>
                         </div>
-                        ` : ''}
-                    </div>
 
-                    <!-- User Menu (Desktop) -->
-                    <div class="hidden md:flex items-center gap-4">
-                        ${isAuthenticated ? `
-                            <div class="flex items-center gap-3 px-4 py-2 border border-pagani-gold/30 rounded-lg">
-                                <div class="text-right">
-                                    <p class="text-xs text-gray-400 uppercase tracking-wider">User</p>
-                                    <p class="text-sm font-orbitron font-bold">${user?.name}</p>
-                                </div>
-                                <div class="text-2xl">👤</div>
+                        <!-- Desktop Navigation -->
+                        <div class="hidden lg:flex items-center justify-center flex-1 max-w-4xl mx-8">
+                            ${!isAuthenticated ? `
+                            <div class="flex items-center gap-4 xl:gap-6">
+                                <a href="/" class="nav-link text-sm tracking-wider uppercase hover:text-pagani-gold transition-all duration-300 py-2 px-3 rounded-md hover:bg-pagani-gold/10">Home</a>
+                                <a href="/about" class="nav-link text-sm tracking-wider uppercase hover:text-pagani-gold transition-all duration-300 py-2 px-3 rounded-md hover:bg-pagani-gold/10">About</a>
+                                <a href="/technology" class="nav-link text-sm tracking-wider uppercase hover:text-pagani-gold transition-all duration-300 py-2 px-3 rounded-md hover:bg-pagani-gold/10">Technology</a>
+                                <a href="/gallery" class="nav-link text-sm tracking-wider uppercase hover:text-pagani-gold transition-all duration-300 py-2 px-3 rounded-md hover:bg-pagani-gold/10">Gallery</a>
+                                <a href="/contact" class="nav-link text-sm tracking-wider uppercase hover:text-pagani-gold transition-all duration-300 py-2 px-3 rounded-md hover:bg-pagani-gold/10">Contact</a>
                             </div>
-                            <button id="logout-btn" class="px-6 py-2 bg-pagani-gold/20 border border-pagani-gold/50 text-xs tracking-[0.2em] hover:bg-pagani-gold hover:text-black transition-all uppercase">
-                                Logout
+                            ` : `
+                            <div class="flex items-center gap-3 xl:gap-4">
+                                <a href="/dashboard" class="nav-link text-xs xl:text-sm tracking-wider uppercase hover:text-pagani-gold transition-all duration-300 flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-pagani-gold/10 border border-transparent hover:border-pagani-gold/30">
+                                    <i class="fa-solid fa-gauge-high text-xs"></i>
+                                    <span class="hidden xl:inline">Dashboard</span>
+                                </a>
+                                <a href="/battery" class="nav-link text-xs xl:text-sm tracking-wider uppercase hover:text-pagani-gold transition-all duration-300 flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-pagani-gold/10 border border-transparent hover:border-pagani-gold/30">
+                                    <i class="fa-solid fa-car-battery text-xs"></i>
+                                    <span class="hidden xl:inline">Battery</span>
+                                </a>
+                                <a href="/rag-chat" class="nav-link text-xs xl:text-sm tracking-wider uppercase hover:text-pagani-gold transition-all duration-300 flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-pagani-gold/10 border border-transparent hover:border-pagani-gold/30">
+                                    <i class="fa-solid fa-robot text-xs"></i>
+                                    <span class="hidden xl:inline">AI Chat</span>
+                                </a>
+                                <a href="/map" class="nav-link text-xs xl:text-sm tracking-wider uppercase hover:text-pagani-gold transition-all duration-300 flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-pagani-gold/10 border border-transparent hover:border-pagani-gold/30">
+                                    <i class="fa-solid fa-route text-xs"></i>
+                                    <span class="hidden xl:inline">Routes</span>
+                                </a>
+                                <a href="/alerts" class="nav-link text-xs xl:text-sm tracking-wider uppercase hover:text-pagani-gold transition-all duration-300 flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-pagani-gold/10 border border-transparent hover:border-pagani-gold/30">
+                                    <i class="fa-solid fa-bell text-xs"></i>
+                                    <span class="hidden xl:inline">Alerts</span>
+                                </a>
+                            </div>
+                            `}
+                        </div>
+
+                        <!-- User Menu (Desktop) - Right Aligned -->
+                        <div class="hidden md:flex items-center gap-3 lg:gap-4 flex-shrink-0 z-10">
+                            ${isAuthenticated ? `
+                            <a href="/profile" class="flex items-center gap-2 lg:gap-3 px-3 lg:px-4 py-2 border border-pagani-gold/30 rounded-lg bg-pagani-black/20 backdrop-blur-sm hover:border-pagani-gold hover:bg-pagani-gold/10 transition-all duration-300 group">
+                                <div class="text-right hidden md:block">
+                                    <p class="text-xs text-gray-400 uppercase tracking-wider group-hover:text-pagani-gold/80 transition-colors">User</p>
+                                    <p class="text-sm font-orbitron font-bold text-pagani-gold">${user?.name}</p>
+                                </div>
+                                <div class="w-8 h-8 rounded-full bg-pagani-gold/20 flex items-center justify-center text-pagani-gold border border-pagani-gold/30 group-hover:bg-pagani-gold/30 group-hover:border-pagani-gold transition-all duration-300">
+                                    <i class="fa-solid fa-user text-sm"></i>
+                                </div>
+                            </a>
+                            <button id="logout-btn" class="px-4 lg:px-6 py-2 bg-pagani-gold/20 border border-pagani-gold/50 text-xs tracking-[0.2em] hover:bg-pagani-gold hover:text-black transition-all uppercase rounded-lg">
+                                <span class="hidden lg:inline">Logout</span>
+                                <i class="fa-solid fa-sign-out-alt lg:hidden"></i>
                             </button>
-                        ` : `
-                            <a href="/auth" class="px-6 py-2 border border-pagani-gold/30 text-xs tracking-[0.2em] hover:text-pagani-gold hover:border-pagani-gold transition-all uppercase">
+                            ` : `
+                            <a href="/auth" class="px-4 lg:px-6 py-2 border border-pagani-gold/30 text-xs tracking-[0.2em] hover:text-pagani-gold hover:border-pagani-gold transition-all uppercase rounded-lg">
                                 Login
                             </a>
-                        `}
+                            `}
+                        </div>
+
+                        <!-- Mobile Menu Button -->
+                        <button id="mobile-menu-btn" class="lg:hidden text-white focus:outline-none p-2 hover:bg-pagani-gold/10 rounded-lg transition-colors ml-auto md:ml-4">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path class="menu-icon" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                                <path class="close-icon hidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
                     </div>
 
-                    <!-- Mobile Menu Button -->
-                    <button id="mobile-menu-btn" class="md:hidden text-white focus:outline-none">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path class="menu-icon" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-                            <path class="close-icon hidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                        </svg>
-                    </button>
-                </div>
-
                 <!-- Mobile Menu -->
-                <div id="mobile-menu" class="md:hidden fixed inset-0 bg-pagani-black/95 backdrop-blur-lg transform translate-x-full transition-transform duration-300 pt-20">
-                    <div class="flex flex-col items-center gap-8 p-8">
-                        <a href="/" class="mobile-nav-link text-2xl tracking-wider uppercase hover:text-pagani-gold transition-colors">Home</a>
-                        <a href="/about" class="mobile-nav-link text-2xl tracking-wider uppercase hover:text-pagani-gold transition-colors">About</a>
-                        <a href="/technology" class="mobile-nav-link text-2xl tracking-wider uppercase hover:text-pagani-gold transition-colors">Technology</a>
-
-                        <a href="/gallery" class="mobile-nav-link text-2xl tracking-wider uppercase hover:text-pagani-gold transition-colors">Gallery</a>
-                        <a href="/contact" class="mobile-nav-link text-2xl tracking-wider uppercase hover:text-pagani-gold transition-colors">Contact</a>
+                <div id="mobile-menu" class="lg:hidden fixed inset-0 bg-pagani-black/98 backdrop-blur-xl transform translate-x-full transition-transform duration-300 pt-16 z-40">
+                    <div class="flex flex-col items-center gap-6 p-4 h-full overflow-y-auto">
+                        ${!isAuthenticated ? `
+                        <div class="flex flex-col items-center gap-6 w-full">
+                            <a href="/" class="mobile-nav-link text-xl tracking-wider uppercase hover:text-pagani-gold transition-colors py-2">Home</a>
+                            <a href="/about" class="mobile-nav-link text-xl tracking-wider uppercase hover:text-pagani-gold transition-colors py-2">About</a>
+                            <a href="/technology" class="mobile-nav-link text-xl tracking-wider uppercase hover:text-pagani-gold transition-colors py-2">Technology</a>
+                            <a href="/gallery" class="mobile-nav-link text-xl tracking-wider uppercase hover:text-pagani-gold transition-colors py-2">Gallery</a>
+                            <a href="/contact" class="mobile-nav-link text-xl tracking-wider uppercase hover:text-pagani-gold transition-colors py-2">Contact</a>
+                        </div>
+                        ` : ''}
                         ${isAuthenticated ? `
-                        <div class="w-full border-t border-pagani-gold/30 pt-6">
-                            <p class="text-xs text-pagani-gold uppercase tracking-wider text-center mb-4">EV Management</p>
-                            <div class="flex flex-col gap-3">
-                                <a href="/dashboard" class="mobile-nav-link flex items-center justify-center gap-3 text-lg tracking-wider uppercase hover:text-pagani-gold transition-colors">
-                                    <i class="fa-solid fa-gauge-high"></i> Dashboard
+                        <div class="w-full">
+                            <div class="text-center mb-6">
+                                <h2 class="text-pagani-gold font-orbitron text-lg uppercase tracking-wider">EV Control Center</h2>
+                                <div class="w-16 h-0.5 bg-pagani-gold mx-auto mt-2"></div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4 mb-6">
+                                <a href="/dashboard" class="mobile-nav-card flex flex-col items-center justify-center gap-3 p-6 border border-pagani-gold/30 rounded-xl hover:bg-pagani-gold/10 hover:border-pagani-gold transition-all duration-300 min-h-[100px]">
+                                    <i class="fa-solid fa-gauge-high text-3xl text-pagani-gold"></i>
+                                    <span class="text-xs uppercase tracking-wider text-center">Dashboard</span>
                                 </a>
-                                <a href="/battery" class="mobile-nav-link flex items-center justify-center gap-3 text-lg tracking-wider uppercase hover:text-pagani-gold transition-colors">
-                                    <i class="fa-solid fa-car-battery"></i> Battery
+                                <a href="/battery" class="mobile-nav-card flex flex-col items-center justify-center gap-3 p-6 border border-pagani-gold/30 rounded-xl hover:bg-pagani-gold/10 hover:border-pagani-gold transition-all duration-300 min-h-[100px]">
+                                    <i class="fa-solid fa-car-battery text-3xl text-pagani-gold"></i>
+                                    <span class="text-xs uppercase tracking-wider text-center">Battery</span>
                                 </a>
-                                <a href="/rag-chat" class="mobile-nav-link flex items-center justify-center gap-3 text-lg tracking-wider uppercase hover:text-pagani-gold transition-colors">
-                                    <i class="fa-solid fa-robot"></i> AI Assistant
+                                <a href="/rag-chat" class="mobile-nav-card flex flex-col items-center justify-center gap-3 p-6 border border-pagani-gold/30 rounded-xl hover:bg-pagani-gold/10 hover:border-pagani-gold transition-all duration-300 min-h-[100px]">
+                                    <i class="fa-solid fa-robot text-3xl text-pagani-gold"></i>
+                                    <span class="text-xs uppercase tracking-wider text-center">AI Chat</span>
                                 </a>
-                                <a href="/map" class="mobile-nav-link flex items-center justify-center gap-3 text-lg tracking-wider uppercase hover:text-pagani-gold transition-colors">
-                                    <i class="fa-solid fa-route"></i> Route Planner
-                                </a>
-                                <a href="/alerts" class="mobile-nav-link flex items-center justify-center gap-3 text-lg tracking-wider uppercase hover:text-pagani-gold transition-colors">
-                                    <i class="fa-solid fa-bell"></i> Alerts
+                                <a href="/map" class="mobile-nav-card flex flex-col items-center justify-center gap-3 p-6 border border-pagani-gold/30 rounded-xl hover:bg-pagani-gold/10 hover:border-pagani-gold transition-all duration-300 min-h-[100px]">
+                                    <i class="fa-solid fa-route text-3xl text-pagani-gold"></i>
+                                    <span class="text-xs uppercase tracking-wider text-center">Routes</span>
                                 </a>
                             </div>
+                            <a href="/alerts" class="mobile-nav-card w-full flex items-center justify-center gap-4 p-4 border border-pagani-gold/30 rounded-xl hover:bg-pagani-gold/10 hover:border-pagani-gold transition-all duration-300">
+                                <i class="fa-solid fa-bell text-2xl text-pagani-gold"></i>
+                                <span class="text-sm uppercase tracking-wider">Smart Alerts & Notifications</span>
+                            </a>
                         </div>
                         ` : ''}
                         <div class="flex flex-col gap-4 w-full mt-8">
                             ${isAuthenticated ? `
-                                <div class="text-center py-3 border border-pagani-gold/30 rounded-lg">
-                                    <p class="text-xs text-gray-400 uppercase tracking-wider">Logged in as</p>
+                                <a href="/profile" class="text-center py-3 border border-pagani-gold/30 rounded-lg hover:border-pagani-gold hover:bg-pagani-gold/10 transition-all duration-300 mobile-nav-link">
+                                    <p class="text-xs text-gray-400 uppercase tracking-wider">Profile Settings</p>
                                     <p class="font-orbitron font-bold text-pagani-gold">${user?.name}</p>
-                                </div>
+                                </a>
                                 <button id="logout-mobile-btn" class="w-full px-8 py-3 bg-pagani-gold/20 border border-pagani-gold/50 text-sm tracking-[0.2em] hover:bg-pagani-gold hover:text-black transition-all uppercase">
                                     Logout
                                 </button>
@@ -157,7 +177,7 @@ export class Navbar {
         menuBtn?.addEventListener('click', () => this.toggleMobileMenu());
 
         // Close menu on link click
-        const mobileLinks = document.querySelectorAll('.mobile-nav-link');
+        const mobileLinks = document.querySelectorAll('.mobile-nav-link, .mobile-nav-card');
         mobileLinks.forEach(link => {
             link.addEventListener('click', () => this.closeMobileMenu());
         });
@@ -209,14 +229,21 @@ export class Navbar {
 
     private updateActiveLink() {
         const currentPath = window.location.pathname;
-        const links = document.querySelectorAll('.nav-link, .mobile-nav-link');
+        const links = document.querySelectorAll('.nav-link, .mobile-nav-link, .mobile-nav-card');
 
         links.forEach(link => {
             const href = link.getAttribute('href');
             if (href === currentPath) {
                 link.classList.add('text-pagani-gold');
+                // Add enhanced active state for mobile cards
+                if (link.classList.contains('mobile-nav-card')) {
+                    link.classList.add('bg-pagani-gold/20', 'border-pagani-gold');
+                }
             } else {
                 link.classList.remove('text-pagani-gold');
+                if (link.classList.contains('mobile-nav-card')) {
+                    link.classList.remove('bg-pagani-gold/20', 'border-pagani-gold');
+                }
             }
         });
     }
