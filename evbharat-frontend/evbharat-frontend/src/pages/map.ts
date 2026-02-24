@@ -338,14 +338,25 @@ async function loadGoogleMap() {
 
     try {
         // 1. Fetch API key from backend
+        console.log('[EVBharat Maps] Fetching API key from', `${apiBase}/api/maps/key`);
         const res = await fetch(`${apiBase}/api/maps/key`);
-        if (!res.ok) throw new Error(`Key endpoint returned ${res.status}`);
+        if (!res.ok) {
+            const err = `Key endpoint returned ${res.status}. Make sure backend is running on port 3001.`;
+            console.error('[EVBharat Maps]', err);
+            throw new Error(err);
+        }
         const data = await res.json();
-        if (!data.key) throw new Error('No key in response');
+        if (!data.key) {
+            const err = 'No Google Maps API key in response. Check GOOGLE_MAPS_API_KEY in backend .env file.';
+            console.error('[EVBharat Maps]', err);
+            throw new Error(err);
+        }
         const apiKey = data.key;
+        console.log('[EVBharat Maps] API key received (✓ first 10 chars:', apiKey.substring(0, 10) + '...)');
 
         // 2. Load Google Maps script (if not already loaded)
         if (typeof google === 'undefined' || !google.maps) {
+            console.log('[EVBharat Maps] Loading Google Maps script...');
             // Remove any previously injected script (avoids duplicate key errors)
             document.querySelectorAll('script[src*="maps.googleapis.com"]').forEach(s => s.remove());
 
@@ -354,28 +365,41 @@ async function loadGoogleMap() {
                 // Google Maps callback-based loading (most reliable)
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 (window as any)[callbackName] = () => {
+                    console.log('[EVBharat Maps] Google Maps library loaded successfully');
                     delete (window as any)[callbackName];
                     resolve();
                 };
 
                 const script = document.createElement('script');
-                script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=${callbackName}`;
+                script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,streetview&callback=${callbackName}`;
                 script.async = true;
                 script.onerror = () => {
                     delete (window as any)[callbackName];
-                    reject(new Error('Google Maps script failed to load'));
+                    const err = 'Google Maps script failed to load. Check API key validity and ensure these APIs are enabled in Google Cloud Console: Maps JavaScript API, Street View API, Places API.';
+                    console.error('[EVBharat Maps]', err);
+                    reject(new Error(err));
                 };
                 document.head.appendChild(script);
 
                 // Safety timeout
-                setTimeout(() => reject(new Error('Google Maps load timed out')), 15000);
+                setTimeout(() => {
+                    if ((window as any)[callbackName]) {
+                        delete (window as any)[callbackName];
+                        const err = 'Google Maps load timed out (15s). Check network and API key.';
+                        console.error('[EVBharat Maps]', err);
+                        reject(new Error(err));
+                    }
+                }, 15000);
             });
+        } else {
+            console.log('[EVBharat Maps] Google Maps already loaded');
         }
 
         // 3. Initialize the map
+        console.log('[EVBharat Maps] Initializing map component...');
         initGoogleMap();
     } catch (err) {
-        console.error('[EVBharat] Google Maps load error:', err);
+        console.error('[EVBharat Maps] Fatal error:', err);
         showMapError(String(err));
     }
 }
@@ -383,21 +407,58 @@ async function loadGoogleMap() {
 function showMapError(detail: string) {
     const loading = document.getElementById('map-loading');
     if (loading) {
+        const isKeyError = detail.toLowerCase().includes('api key') || detail.toLowerCase().includes('script failed');
+        const isBackendError = detail.toLowerCase().includes('endpoint') || detail.toLowerCase().includes('port 3001');
+        
+        let troubleSteps = '';
+        if (isBackendError) {
+            troubleSteps = `
+                <div style="text-align:left;margin-top:12px;font-size:11px;color:#fbbf24;background:rgba(0,0,0,0.3);padding:8px;border-radius:6px">
+                    <strong>✓ Backend Fix:</strong> Start backend server with: <code style="background:rgba(0,0,0,0.5);padding:2px 6px;border-radius:3px">npm start</code>
+                </div>
+            `;
+        } else if (isKeyError) {
+            troubleSteps = `
+                <div style="text-align:left;margin-top:12px;font-size:11px;color:#fbbf24;background:rgba(0,0,0,0.3);padding:8px;border-radius:6px">
+                    <strong>✓ API Key Fix:</strong>
+                    <ol style="margin:6px 0 0 16px;padding:0">
+                        <li>Go to <a href="https://console.cloud.google.com/apis/library" target="_blank" style="color:#60a5fa">Google Cloud Console</a></li>
+                        <li>Enable: Maps JavaScript API, Street View API, Places API</li>
+                        <li>Verify API key has billing enabled</li>
+                        <li>Update GOOGLE_MAPS_API_KEY in backend/.env</li>
+                    </ol>
+                </div>
+            `;
+        }
+        
         loading.innerHTML = `
             <div class="text-center">
                 <i class="fa-solid fa-triangle-exclamation text-red-400 text-3xl mb-3"></i>
                 <p class="text-red-400 text-sm font-orbitron mb-1">Failed to load map</p>
-                <p class="text-gray-500 text-xs">${detail}</p>
+                <p class="text-gray-500 text-xs" style="max-width:400px;margin:0 auto">${detail}</p>
+                ${troubleSteps}
+                <p style="margin-top:12px;font-size:10px;color:#6b7280">📋 Check browser console (F12) for technical details</p>
             </div>`;
     }
 }
 
 function initGoogleMap() {
     const container = document.getElementById('google-map');
-    if (!container) { console.error('[EVBharat] #google-map container not found'); return; }
-    if (typeof google === 'undefined') { console.error('[EVBharat] google is undefined'); return; }
+    if (!container) { 
+        const err = '#google-map container not found in DOM';
+        console.error('[EVBharat Maps]', err);
+        showMapError(err);
+        return;
+    }
+    if (typeof google === 'undefined') { 
+        const err = 'google is undefined - Maps library failed to initialize';
+        console.error('[EVBharat Maps]', err);
+        showMapError(err);
+        return;
+    }
 
     try {
+        console.log('[EVBharat Maps] Creating Google Maps instance...');
         // ── Create map with full controls ──
         googleMap = new google.maps.Map(container, {
             center: { lat: 27.5, lng: 76.5 },
@@ -475,10 +536,11 @@ function initGoogleMap() {
         const loading = document.getElementById('map-loading');
         if (loading) loading.style.display = 'none';
 
-        console.log('[EVBharat] Google Map initialized successfully');
+        console.log('[EVBharat Maps] Google Map initialized successfully');
     } catch (err) {
-        console.error('[EVBharat] initGoogleMap error:', err);
-        showMapError(String(err));
+        const errMsg = err instanceof Error ? err.message : String(err);
+        console.error('[EVBharat Maps] Map initialization error:', errMsg, err);
+        showMapError(`Map init failed: ${errMsg}`);
     }
 }
 

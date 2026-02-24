@@ -1,0 +1,24 @@
+Electric Vehicle Policy Test Document
+==========================================
+
+FAME II Scheme Details:
+- Total budget: ₹10,000 crores over 3 years
+- Support for 10 lakh electric two-wheelers
+- Support for 5 lakh electric three-wheelers  
+- Support for 55,000 electric four-wheelers
+- Support for 7,090 electric buses
+
+State Incentives:
+Maharashtra: Additional ₹5,000 subsidy on electric two-wheelers
+Gujarat: 100% road tax exemption for EVs
+Karnataka: 15% capital subsidy for EV manufacturing
+
+Charging Infrastructure:
+- Target: 2,877 public charging stations
+- Fast charging stations every 25 km on highways
+- Normal charging stations every 3 km in cities
+
+Battery Requirements:
+- Minimum energy density: 80 Wh/kg
+- Warranty: 3 years or 75,000 km
+- Made in India certification required for incentives
