@@ -11,7 +11,14 @@ dotenv.config();
 const app = express();
 const port = Number(process.env.PORT) || 3001;
 const jwtSecret = process.env.JWT_SECRET || 'change-me';
-const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173';
+// Support multiple development ports for flexible development
+const corsOrigin = process.env.CORS_ORIGIN || [
+  'http://localhost:5173',
+  'http://localhost:5174', 
+  'http://localhost:3000',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:5174'
+];
 const dbPath = process.env.DB_PATH || './data/evbharat.sqlite';
 
 const db = await open({
