@@ -1,4 +1,5 @@
 import { authService } from '../utils/auth';
+import { bluetoothService } from '../utils/bluetooth-service';
 
 export async function renderDashboardPage() {
     // Check if user is authenticated
@@ -268,6 +269,80 @@ export async function renderDashboardPage() {
                             </p>
                         </div>
 
+                        <!-- Vehicle Control -->
+                        <div class="bg-gradient-to-br from-blue-900/30 to-pagani-black border border-blue-500/30 rounded-xl p-6 fade-in-section">
+                            <h3 class="text-lg font-orbitron font-bold mb-4 flex items-center gap-2 text-blue-400">
+                                <i class="fa-solid fa-gamepad"></i>
+                                Vehicle Control
+                            </h3>
+                            
+                            <!-- Connection Status -->
+                            <div id="bt-status" class="mb-4 p-3 bg-gray-800/50 rounded-lg border border-gray-700/50">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-2">
+                                        <div id="bt-indicator" class="w-2 h-2 bg-red-500 rounded-full"></div>
+                                        <span id="bt-status-text" class="text-xs text-gray-400">Disconnected</span>
+                                    </div>
+                                    <button id="bt-connect-btn" class="px-3 py-1 bg-blue-500/20 border border-blue-500/50 rounded-md text-xs text-blue-400 hover:bg-blue-500/30 transition-all">
+                                        Connect
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Telemetry Data -->
+                            <div id="vehicle-telemetry" class="mb-4 grid grid-cols-2 gap-2 opacity-50">
+                                <div class="p-2 bg-gray-800/50 rounded text-center">
+                                    <p id="telemetry-battery" class="text-lg font-orbitron font-bold text-green-400">--</p>
+                                    <p class="text-xs text-gray-500">Battery</p>
+                                </div>
+                                <div class="p-2 bg-gray-800/50 rounded text-center">
+                                    <p id="telemetry-temp" class="text-lg font-orbitron font-bold">--</p>
+                                    <p class="text-xs text-gray-500">Temp °C</p>
+                                </div>
+                                <div class="col-span-2 p-2 bg-gray-800/50 rounded text-center">
+                                    <p id="telemetry-direction" class="text-sm font-orbitron font-bold text-gray-400">STOP</p>
+                                    <p class="text-xs text-gray-500">Direction</p>
+                                </div>
+                            </div>
+
+                            <!-- D-Pad Controls -->
+                            <div class="relative w-full aspect-square max-w-[200px] mx-auto mb-4">
+                                <!-- Center -->
+                                <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-gray-800 rounded-full border-2 border-gray-700 flex items-center justify-center">
+                                    <i class="fa-solid fa-car text-2xl text-gray-600"></i>
+                                </div>
+                                
+                                <!-- Up (Forward) -->
+                                <button id="ctrl-forward" class="absolute left-1/2 -translate-x-1/2 top-0 w-16 h-20 bg-gradient-to-b from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 rounded-t-xl border border-blue-400/50 flex items-center justify-center text-white shadow-lg disabled:opacity-30 disabled:cursor-not-allowed">
+                                    <i class="fa-solid fa-chevron-up text-xl"></i>
+                                </button>
+                                
+                                <!-- Down (Backward) -->
+                                <button id="ctrl-backward" class="absolute left-1/2 -translate-x-1/2 bottom-0 w-16 h-20 bg-gradient-to-b from-blue-700 to-blue-800 hover:from-blue-600 hover:to-blue-700 rounded-b-xl border border-blue-400/50 flex items-center justify-center text-white shadow-lg disabled:opacity-30 disabled:cursor-not-allowed">
+                                    <i class="fa-solid fa-chevron-down text-xl"></i>
+                                </button>
+                                
+                                <!-- Left -->
+                                <button id="ctrl-left" class="absolute top-1/2 -translate-y-1/2 left-0 w-20 h-16 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 rounded-l-xl border border-blue-400/50 flex items-center justify-center text-white shadow-lg disabled:opacity-30 disabled:cursor-not-allowed">
+                                    <i class="fa-solid fa-chevron-left text-xl"></i>
+                                </button>
+                                
+                                <!-- Right -->
+                                <button id="ctrl-right" class="absolute top-1/2 -translate-y-1/2 right-0 w-20 h-16 bg-gradient-to-r from-blue-700 to-blue-800 hover:from-blue-600 hover:to-blue-700 rounded-r-xl border border-blue-400/50 flex items-center justify-center text-white shadow-lg disabled:opacity-30 disabled:cursor-not-allowed">
+                                    <i class="fa-solid fa-chevron-right text-xl"></i>
+                                </button>
+                            </div>
+
+                            <!-- Stop Button -->
+                            <button id="ctrl-stop" class="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-orbitron font-bold rounded-lg transition-all uppercase tracking-wider disabled:opacity-30 disabled:cursor-not-allowed">
+                                <i class="fa-solid fa-hand mr-2"></i> STOP
+                            </button>
+
+                            <p class="text-xs text-gray-500 text-center mt-3">
+                                <i class="fa-solid fa-bluetooth mr-1"></i> Requires Bluetooth bridge running
+                            </p>
+                        </div>
+
                         <!-- Recent Alerts -->
                         <div class="bg-gradient-to-br from-gray-900 to-pagani-black border border-pagani-gold/20 rounded-xl p-6 fade-in-section">
                             <div class="flex items-center justify-between mb-4">
@@ -446,6 +521,9 @@ function initializeDashboard() {
         alert('Running vehicle diagnostics... All systems operational!');
     });
 
+    // Bluetooth Vehicle Control
+    initializeVehicleControl();
+
     // Animate stats on scroll
     const animateSections = document.querySelectorAll('.fade-in-section');
     const observer = new IntersectionObserver((entries) => {
@@ -457,4 +535,165 @@ function initializeDashboard() {
     }, { threshold: 0.1 });
 
     animateSections.forEach(section => observer.observe(section));
+}
+
+function initializeVehicleControl() {
+    const btConnectBtn = document.getElementById('bt-connect-btn');
+    const btIndicator = document.getElementById('bt-indicator');
+    const btStatusText = document.getElementById('bt-status-text');
+    const telemetryContainer = document.getElementById('vehicle-telemetry');
+    
+    const ctrlForward = document.getElementById('ctrl-forward') as HTMLButtonElement;
+    const ctrlBackward = document.getElementById('ctrl-backward') as HTMLButtonElement;
+    const ctrlLeft = document.getElementById('ctrl-left') as HTMLButtonElement;
+    const ctrlRight = document.getElementById('ctrl-right') as HTMLButtonElement;
+    const ctrlStop = document.getElementById('ctrl-stop') as HTMLButtonElement;
+    
+    const telemetryBattery = document.getElementById('telemetry-battery');
+    const telemetryTemp = document.getElementById('telemetry-temp');
+    const telemetryDirection = document.getElementById('telemetry-direction');
+    
+    // Initially disable controls
+    const controlButtons = [ctrlForward, ctrlBackward, ctrlLeft, ctrlRight, ctrlStop];
+    controlButtons.forEach(btn => btn && (btn.disabled = true));
+    
+    // Subscribe to status changes
+    bluetoothService.onStatusChange((status) => {
+        if (status.connected) {
+            btIndicator?.classList.remove('bg-red-500');
+            btIndicator?.classList.add('bg-green-500', 'animate-pulse');
+            if (btStatusText) btStatusText.textContent = `Connected to ${status.device || 'ESP32'}`;
+            if (btConnectBtn) {
+                btConnectBtn.textContent = 'Connected';
+                btConnectBtn.classList.add('bg-green-500/20', 'border-green-500/50', 'text-green-400');
+                btConnectBtn.classList.remove('bg-blue-500/20', 'border-blue-500/50', 'text-blue-400');
+            }
+            telemetryContainer?.classList.remove('opacity-50');
+            
+            // Enable control buttons
+            controlButtons.forEach(btn => btn && (btn.disabled = false));
+        } else {
+            btIndicator?.classList.remove('bg-green-500', 'animate-pulse');
+            btIndicator?.classList.add('bg-red-500');
+            if (btStatusText) btStatusText.textContent = 'Disconnected';
+            if (btConnectBtn) {
+                btConnectBtn.textContent = 'Connect';
+                btConnectBtn.classList.remove('bg-green-500/20', 'border-green-500/50', 'text-green-400');
+                btConnectBtn.classList.add('bg-blue-500/20', 'border-blue-500/50', 'text-blue-400');
+            }
+            telemetryContainer?.classList.add('opacity-50');
+            
+            // Disable control buttons
+            controlButtons.forEach(btn => btn && (btn.disabled = true));
+        }
+    });
+    
+    // Subscribe to telemetry updates
+    bluetoothService.onTelemetry((telemetry) => {
+        if (telemetryBattery) telemetryBattery.textContent = `${telemetry.battery}%`;
+        if (telemetryTemp) telemetryTemp.textContent = `${telemetry.temperature.toFixed(1)}°C`;
+        if (telemetryDirection) {
+            telemetryDirection.textContent = telemetry.direction;
+            // Add color based on status
+            if (telemetry.moving) {
+                telemetryDirection.classList.remove('text-gray-400');
+                telemetryDirection.classList.add('text-green-400');
+            } else {
+                telemetryDirection.classList.remove('text-green-400');
+                telemetryDirection.classList.add('text-gray-400');
+            }
+        }
+    });
+    
+    // Connect button
+    btConnectBtn?.addEventListener('click', () => {
+        const status = bluetoothService.getStatus();
+        if (!status.connected) {
+            bluetoothService.connectToESP32();
+            if (btConnectBtn) btConnectBtn.textContent = 'Connecting...';
+        }
+    });
+    
+    // Control buttons
+    ctrlForward?.addEventListener('click', () => {
+        bluetoothService.sendCommand('FORWARD');
+    });
+    
+    ctrlBackward?.addEventListener('click', () => {
+        bluetoothService.sendCommand('BACKWARD');
+    });
+    
+    ctrlLeft?.addEventListener('click', () => {
+        bluetoothService.sendCommand('LEFT');
+    });
+    
+    ctrlRight?.addEventListener('click', () => {
+        bluetoothService.sendCommand('RIGHT');
+    });
+    
+    ctrlStop?.addEventListener('click', () => {
+        bluetoothService.sendCommand('STOP');
+    });
+    
+    // Keyboard controls (WASD or Arrow keys)
+    document.addEventListener('keydown', (e) => {
+        const status = bluetoothService.getStatus();
+        if (!status.connected) return;
+        
+        switch(e.key.toLowerCase()) {
+            case 'w':
+            case 'arrowup':
+                e.preventDefault();
+                ctrlForward?.classList.add('scale-95');
+                bluetoothService.sendCommand('FORWARD');
+                break;
+            case 's':
+            case 'arrowdown':
+                e.preventDefault();
+                ctrlBackward?.classList.add('scale-95');
+                bluetoothService.sendCommand('BACKWARD');
+                break;
+            case 'a':
+            case 'arrowleft':
+                e.preventDefault();
+                ctrlLeft?.classList.add('scale-95');
+                bluetoothService.sendCommand('LEFT');
+                break;
+            case 'd':
+            case 'arrowright':
+                e.preventDefault();
+                ctrlRight?.classList.add('scale-95');
+                bluetoothService.sendCommand('RIGHT');
+                break;
+            case ' ':
+                e.preventDefault();
+                ctrlStop?.classList.add('scale-95');
+                bluetoothService.sendCommand('STOP');
+                break;
+        }
+    });
+    
+    document.addEventListener('keyup', (e) => {
+        switch(e.key.toLowerCase()) {
+            case 'w':
+            case 'arrowup':
+                ctrlForward?.classList.remove('scale-95');
+                break;
+            case 's':
+            case 'arrowdown':
+                ctrlBackward?.classList.remove('scale-95');
+                break;
+            case 'a':
+            case 'arrowleft':
+                ctrlLeft?.classList.remove('scale-95');
+                break;
+            case 'd':
+            case 'arrowright':
+                ctrlRight?.classList.remove('scale-95');
+                break;
+            case ' ':
+                ctrlStop?.classList.remove('scale-95');
+                break;
+        }
+    });
 }
