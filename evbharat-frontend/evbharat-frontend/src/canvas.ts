@@ -6,13 +6,19 @@ export class ZondaScrollCanvas {
     private totalFrames: number = 240;
     private isLoaded: boolean = false;
     private currentFrameIndex: number = -1;
+    private framePathBuilder: (frameNumber: number) => string;
 
-    constructor(canvasId: string, totalFrames: number = 240) {
+    constructor(
+        canvasId: string,
+        totalFrames: number = 240,
+        framePathBuilder: (frameNumber: number) => string = (frameNumber) => `/images/zonda-sequence/${frameNumber}.jpg`
+    ) {
         this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
         if (!this.canvas) throw new Error(`Canvas with id ${canvasId} not found`);
 
         this.ctx = this.canvas.getContext('2d', { alpha: false }); // Alpha false for slight perf boost if opaque bg
         this.totalFrames = totalFrames;
+        this.framePathBuilder = framePathBuilder;
 
         if (this.ctx) {
             this.ctx.imageSmoothingEnabled = true;
@@ -51,7 +57,7 @@ export class ZondaScrollCanvas {
         let loadedCount = 0;
         for (let i = 1; i <= this.totalFrames; i++) {
             const img = new Image();
-            img.src = `/images/zonda-sequence/${i}.jpg`;
+            img.src = this.framePathBuilder(i);
             img.onload = () => {
                 loadedCount++;
                 if (loadedCount === this.totalFrames) {

@@ -123,7 +123,11 @@ export async function renderHomePage() {
     `;
 
     // Initialize scroll canvas and HUD
-    const zondaCanvas = new ZondaScrollCanvas('zonda-canvas', 241);
+    const zondaCanvas = new ZondaScrollCanvas(
+        'zonda-canvas',
+        40,
+        (frameNumber) => `/images/ezgif-49d96893fca105bb-jpg/ezgif-frame-${String(frameNumber).padStart(3, '0')}.jpg`
+    );
     const zondaHUD = new ZondaHUD('zonda-hud');
 
     // Scroll handler
