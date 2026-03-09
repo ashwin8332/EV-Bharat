@@ -12,6 +12,8 @@ export async function renderDashboardPage() {
     if (!app) return;
 
     const user = authService.getCurrentUser();
+    const portalMode = localStorage.getItem('evbharat_portal_mode') || 'ev';
+    const isFactoryPortal = portalMode === 'factory';
 
     // Load Font Awesome
     if (!document.querySelector('link[href*="font-awesome"]')) {
@@ -105,7 +107,7 @@ export async function renderDashboardPage() {
                     <!-- Left Column - Battery & Health -->
                     <div class="lg:col-span-2 space-y-6">
                         <!-- Battery Health Card -->
-                        <div class="bg-gradient-to-br from-gray-900 to-pagani-black border border-pagani-gold/20 rounded-xl p-6 fade-in-section">
+                        <div id="quick-route-planner-card" class="bg-gradient-to-br from-gray-900 to-pagani-black border border-pagani-gold/20 rounded-xl p-6 fade-in-section">
                             <div class="flex items-center justify-between mb-6">
                                 <h3 class="text-lg font-orbitron font-bold flex items-center gap-2">
                                     <i class="fa-solid fa-heart-pulse text-red-400"></i>
@@ -147,6 +149,7 @@ export async function renderDashboardPage() {
                             </div>
                         </div>
 
+                        ${!isFactoryPortal ? `
                         <!-- Quick Route Planner -->
                         <div class="bg-gradient-to-br from-gray-900 to-pagani-black border border-pagani-gold/20 rounded-xl p-6 fade-in-section">
                             <div class="flex items-center justify-between mb-6">
@@ -201,6 +204,7 @@ export async function renderDashboardPage() {
                                 <i class="fa-solid fa-map-location-dot"></i> Plan Route
                             </a>
                         </div>
+                        ` : ''}
 
                         <!-- V2E Communication Status -->
                         <div class="bg-gradient-to-br from-gray-900 to-pagani-black border border-pagani-gold/20 rounded-xl p-6 fade-in-section">
@@ -383,7 +387,7 @@ export async function renderDashboardPage() {
                                 </div>
 
                                 <!-- Info Alert -->
-                                <div class="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                                <div id="route-updated-alert" class="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
                                     <div class="flex items-start gap-3">
                                         <div class="w-8 h-8 bg-blue-500/20 rounded-full flex items-center justify-center flex-shrink-0">
                                             <i class="fa-solid fa-route text-blue-400 text-sm"></i>
@@ -399,7 +403,7 @@ export async function renderDashboardPage() {
                         </div>
 
                         <!-- Nearby Charging Stations -->
-                        <div class="bg-gradient-to-br from-gray-900 to-pagani-black border border-pagani-gold/20 rounded-xl p-6 fade-in-section">
+                        <div id="nearby-stations-card" class="bg-gradient-to-br from-gray-900 to-pagani-black border border-pagani-gold/20 rounded-xl p-6 fade-in-section">
                             <div class="flex items-center justify-between mb-4">
                                 <h3 class="text-lg font-orbitron font-bold flex items-center gap-2">
                                     <i class="fa-solid fa-charging-station text-green-400"></i>
@@ -461,7 +465,7 @@ export async function renderDashboardPage() {
                                     <i class="fa-solid fa-car-battery text-2xl text-green-400 mb-2 group-hover:scale-110 transition-transform"></i>
                                     <p class="text-xs font-orbitron">Battery</p>
                                 </a>
-                                <a href="/map" class="p-4 bg-pagani-black/50 border border-pagani-gold/20 rounded-lg text-center hover:border-pagani-gold/50 transition-all group">
+                                <a id="quick-route-action" href="/map" class="p-4 bg-pagani-black/50 border border-pagani-gold/20 rounded-lg text-center hover:border-pagani-gold/50 transition-all group">
                                     <i class="fa-solid fa-route text-2xl text-blue-400 mb-2 group-hover:scale-110 transition-transform"></i>
                                     <p class="text-xs font-orbitron">Route</p>
                                 </a>
@@ -480,6 +484,13 @@ export async function renderDashboardPage() {
             </div>
         </div>
     `;
+
+    if (isFactoryPortal) {
+        document.getElementById('quick-route-planner-card')?.remove();
+        document.getElementById('nearby-stations-card')?.remove();
+        document.getElementById('quick-route-action')?.remove();
+        document.getElementById('route-updated-alert')?.remove();
+    }
 
     // Initialize dashboard functionality
     setTimeout(() => {

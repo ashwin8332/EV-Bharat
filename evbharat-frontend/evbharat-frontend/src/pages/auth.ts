@@ -202,6 +202,86 @@ export async function renderAuthPage() {
                 box-shadow: 0 8px 25px rgba(212, 175, 55, 0.4);
                 transform: translateY(-2px);
             }
+
+            .portal-switch {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+                padding: 6px;
+                border-radius: 10px;
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                background: rgba(0, 0, 0, 0.35);
+                margin-bottom: 18px;
+            }
+
+            .portal-btn {
+                border: 1px solid transparent;
+                border-radius: 8px;
+                padding: 10px 12px;
+                font-size: 11px;
+                text-transform: uppercase;
+                letter-spacing: 0.16em;
+                font-weight: 700;
+                cursor: pointer;
+                color: rgba(255, 255, 255, 0.75);
+                background: transparent;
+                transition: all 0.25s ease;
+            }
+
+            .portal-btn.active {
+                color: #020617;
+                border-color: rgba(34, 211, 238, 0.75);
+                background: linear-gradient(135deg, #67e8f9, #22d3ee);
+                box-shadow: 0 8px 18px rgba(6, 182, 212, 0.28);
+            }
+
+            .auth-container.mode-factory .form-input {
+                border-color: rgba(34, 211, 238, 0.38);
+            }
+
+            .auth-container.mode-factory .form-input:focus {
+                border-color: #22d3ee;
+                box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.12);
+            }
+
+            .auth-container.mode-factory .submit-btn {
+                background: linear-gradient(135deg, #67e8f9, #22d3ee);
+            }
+
+            .auth-container.mode-factory .submit-btn:hover {
+                box-shadow: 0 8px 25px rgba(34, 211, 238, 0.36);
+            }
+
+            .auth-container.mode-factory .overlay {
+                background: linear-gradient(135deg, #0ea5e9, #22d3ee, #0f172a);
+            }
+
+            .auth-container.mode-factory .ghost-btn {
+                border-color: #020617;
+                color: #020617;
+            }
+
+            .auth-container.mode-factory .ghost-btn:hover {
+                background-color: #020617;
+                color: #67e8f9;
+            }
+
+            .auth-container.mode-factory .text-pagani-gold,
+            .auth-container.mode-factory .toggle-password:hover,
+            .auth-container.mode-factory #showRegisterMobile,
+            .auth-container.mode-factory #showLoginMobile,
+            .auth-container.mode-factory a:hover {
+                color: #67e8f9 !important;
+            }
+
+            .auth-container.mode-factory #remember-me,
+            .auth-container.mode-factory #terms-checkbox {
+                accent-color: #22d3ee;
+            }
+
+            #authThemeRoot.mode-factory .auth-glow {
+                background: rgba(56, 189, 248, 0.2);
+            }
             
             .form-control {
                 position: relative;
@@ -290,19 +370,25 @@ export async function renderAuthPage() {
             <div class="absolute inset-0 bg-gradient-to-br from-pagani-black via-gray-900 to-pagani-black"></div>
             <div class="absolute inset-0 bg-[radial-gradient(circle_at_20%_30%,rgba(212,175,55,0.15),transparent_50%)]"></div>
             <div class="absolute inset-0 bg-[radial-gradient(circle_at_80%_70%,rgba(212,175,55,0.1),transparent_50%)]"></div>
-            <div class="absolute top-20 left-20 w-72 h-72 bg-pagani-gold/5 rounded-full blur-3xl animate-pulse"></div>
-            <div class="absolute bottom-20 right-20 w-96 h-96 bg-pagani-gold/5 rounded-full blur-3xl animate-pulse" style="animation-delay: 1s"></div>
+            <div class="auth-glow absolute top-20 left-20 w-72 h-72 bg-pagani-gold/5 rounded-full blur-3xl animate-pulse"></div>
+            <div class="auth-glow absolute bottom-20 right-20 w-96 h-96 bg-pagani-gold/5 rounded-full blur-3xl animate-pulse" style="animation-delay: 1s"></div>
         </div>
 
-        <div class="min-h-screen flex items-center justify-center px-4 py-12">
+        <div id="authThemeRoot" class="min-h-screen flex items-center justify-center px-4 py-12">
             <div class="auth-container" id="authContainer">
                 <!-- Login Form -->
                 <div class="form-container login-container" id="loginContainer">
                     <form id="loginForm" novalidate>
-                        <h1 class="text-2xl font-orbitron font-bold text-white mb-2">Welcome Back</h1>
-                        <p class="text-gray-400 text-sm mb-6">Sign in to access your EV dashboard</p>
+                        <div class="portal-switch" role="tablist" aria-label="Select login portal">
+                            <button type="button" class="portal-btn" id="modeEvBtn" data-mode="ev">EV Portal</button>
+                            <button type="button" class="portal-btn" id="modeFactoryBtn" data-mode="factory">Dark Factory</button>
+                        </div>
+
+                        <h1 class="text-2xl font-orbitron font-bold text-white mb-2" id="loginPortalTitle">EV Portal Login</h1>
+                        <p class="text-gray-400 text-sm mb-6" id="loginPortalDescription">Sign in to access your EV dashboard</p>
                         
                         <div id="login-status" class="form-status"></div>
+                        <input type="hidden" id="login-portal-mode" value="ev" />
                         
                         <div class="form-control">
                             <input type="email" id="login-email" class="form-input" placeholder="Email or Username" required />
@@ -457,6 +543,38 @@ function initializeAuthFunctionality() {
     const showLoginMobile = document.getElementById('showLoginMobile');
     const loginContainer = document.getElementById('loginContainer');
     const registerContainer = document.getElementById('registerContainer');
+    const modeEvBtn = document.getElementById('modeEvBtn');
+    const modeFactoryBtn = document.getElementById('modeFactoryBtn');
+    const loginPortalMode = document.getElementById('login-portal-mode') as HTMLInputElement | null;
+    const loginPortalTitle = document.getElementById('loginPortalTitle');
+    const loginPortalDescription = document.getElementById('loginPortalDescription');
+    const authThemeRoot = document.getElementById('authThemeRoot');
+
+    const applyPortalMode = (mode: 'ev' | 'factory') => {
+        loginPortalMode && (loginPortalMode.value = mode);
+
+        const isFactory = mode === 'factory';
+        authContainer?.classList.toggle('mode-factory', isFactory);
+        authContainer?.classList.toggle('mode-ev', !isFactory);
+        authThemeRoot?.classList.toggle('mode-factory', isFactory);
+        authThemeRoot?.classList.toggle('mode-ev', !isFactory);
+
+        modeEvBtn?.classList.toggle('active', !isFactory);
+        modeFactoryBtn?.classList.toggle('active', isFactory);
+
+        if (loginPortalTitle) {
+            loginPortalTitle.textContent = isFactory ? 'Dark Factory Login' : 'EV Portal Login';
+        }
+        if (loginPortalDescription) {
+            loginPortalDescription.textContent = isFactory
+                ? 'Sign in to monitor robotics lines, alerts, and industrial analytics'
+                : 'Sign in to access your EV dashboard';
+        }
+    };
+
+    modeEvBtn?.addEventListener('click', () => applyPortalMode('ev'));
+    modeFactoryBtn?.addEventListener('click', () => applyPortalMode('factory'));
+    applyPortalMode('ev');
 
     // Desktop panel switching
     showRegisterBtn?.addEventListener('click', () => {
@@ -615,6 +733,7 @@ async function handleLogin() {
     const emailError = document.getElementById('login-email-error');
     const passwordError = document.getElementById('login-password-error');
     const statusDiv = document.getElementById('login-status');
+    const portalModeInput = document.getElementById('login-portal-mode') as HTMLInputElement | null;
 
     let isValid = true;
 
@@ -648,9 +767,11 @@ async function handleLogin() {
     const result = await authService.login(emailInput.value, passwordInput.value);
     
     if (result.success) {
+        const portalMode = portalModeInput?.value || 'ev';
+        localStorage.setItem('evbharat_portal_mode', portalMode);
         showStatus(statusDiv, 'Login successful! Redirecting...', 'success');
         setTimeout(() => {
-            window.location.href = '/dashboard';
+            window.location.href = portalMode === 'factory' ? '/factory-dashboard' : '/dashboard';
         }, 1500);
     } else {
         showStatus(statusDiv, result.message, 'error');

@@ -13,9 +13,29 @@ export class Navbar {
     private render() {
         const isAuthenticated = authService.isAuthenticated();
         const user = authService.getCurrentUser();
+        const portalMode = localStorage.getItem('evbharat_portal_mode') || 'ev';
+        const isFactoryMode = portalMode === 'factory';
+        const dashboardPath = portalMode === 'factory' ? '/factory-dashboard' : '/dashboard';
         
         const navbarHTML = `
-            <nav class="fixed top-0 left-0 w-full z-50 px-4 md:px-8 py-3 md:py-4 transition-all duration-300" id="navbar">
+            ${isFactoryMode ? `
+            <style id="factory-navbar-theme">
+                .factory-mode .text-pagani-gold { color: #67e8f9 !important; }
+                .factory-mode .hover\\:text-pagani-gold:hover { color: #67e8f9 !important; }
+                .factory-mode .border-pagani-gold\\/10,
+                .factory-mode .border-pagani-gold\\/20,
+                .factory-mode .border-pagani-gold\\/30,
+                .factory-mode .border-pagani-gold\\/50,
+                .factory-mode .hover\\:border-pagani-gold:hover { border-color: rgba(34, 211, 238, 0.45) !important; }
+                .factory-mode .bg-pagani-gold\\/10 { background-color: rgba(34, 211, 238, 0.10) !important; }
+                .factory-mode .bg-pagani-gold\\/20 { background-color: rgba(34, 211, 238, 0.16) !important; }
+                .factory-mode .hover\\:bg-pagani-gold\\/10:hover { background-color: rgba(34, 211, 238, 0.16) !important; }
+                .factory-mode .bg-pagani-gold { background-color: #22d3ee !important; }
+                .factory-mode .hover\\:bg-pagani-gold:hover { background-color: #22d3ee !important; }
+                .factory-mode .hover\\:text-black:hover { color: #020617 !important; }
+            </style>
+            ` : ''}
+            <nav class="fixed top-0 left-0 w-full z-50 px-4 md:px-8 py-3 md:py-4 transition-all duration-300 ${isFactoryMode ? 'factory-mode' : ''}" id="navbar">
                 <div class="max-w-7xl mx-auto">
                     <div class="flex items-center justify-between">
                         <!-- Logo -->
@@ -37,10 +57,32 @@ export class Navbar {
                             </div>
                             ` : `
                             <div class="flex items-center gap-3 xl:gap-4">
-                                <a href="/dashboard" class="nav-link text-xs xl:text-sm tracking-wider uppercase hover:text-pagani-gold transition-all duration-300 flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-pagani-gold/10 border border-transparent hover:border-pagani-gold/30">
+                                <a href="${dashboardPath}" class="nav-link text-xs xl:text-sm tracking-wider uppercase hover:text-pagani-gold transition-all duration-300 flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-pagani-gold/10 border border-transparent hover:border-pagani-gold/30">
                                     <i class="fa-solid fa-gauge-high text-xs"></i>
-                                    <span class="hidden xl:inline">Dashboard</span>
+                                    <span class="hidden xl:inline">${portalMode === 'factory' ? 'Factory' : 'Dashboard'}</span>
                                 </a>
+                                ${portalMode === 'factory' ? `
+                                <a href="/dashboard" class="nav-link text-xs xl:text-sm tracking-wider uppercase hover:text-pagani-gold transition-all duration-300 flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-pagani-gold/10 border border-transparent hover:border-pagani-gold/30">
+                                    <i class="fa-solid fa-car-side text-xs"></i>
+                                    <span class="hidden xl:inline">EV Dashboard</span>
+                                </a>
+                                <a href="/alerts" class="nav-link text-xs xl:text-sm tracking-wider uppercase hover:text-pagani-gold transition-all duration-300 flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-pagani-gold/10 border border-transparent hover:border-pagani-gold/30">
+                                    <i class="fa-solid fa-bell text-xs"></i>
+                                    <span class="hidden xl:inline">Incidents</span>
+                                </a>
+                                <a href="/rag-chat" class="nav-link text-xs xl:text-sm tracking-wider uppercase hover:text-pagani-gold transition-all duration-300 flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-pagani-gold/10 border border-transparent hover:border-pagani-gold/30">
+                                    <i class="fa-solid fa-robot text-xs"></i>
+                                    <span class="hidden xl:inline">AI Ops</span>
+                                </a>
+                                <a href="/gallery" class="nav-link text-xs xl:text-sm tracking-wider uppercase hover:text-pagani-gold transition-all duration-300 flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-pagani-gold/10 border border-transparent hover:border-pagani-gold/30">
+                                    <i class="fa-solid fa-camera text-xs"></i>
+                                    <span class="hidden xl:inline">Camera Wall</span>
+                                </a>
+                                <a href="/profile" class="nav-link text-xs xl:text-sm tracking-wider uppercase hover:text-pagani-gold transition-all duration-300 flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-pagani-gold/10 border border-transparent hover:border-pagani-gold/30">
+                                    <i class="fa-solid fa-user text-xs"></i>
+                                    <span class="hidden xl:inline">Operator</span>
+                                </a>
+                                ` : `
                                 <a href="/battery" class="nav-link text-xs xl:text-sm tracking-wider uppercase hover:text-pagani-gold transition-all duration-300 flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-pagani-gold/10 border border-transparent hover:border-pagani-gold/30">
                                     <i class="fa-solid fa-car-battery text-xs"></i>
                                     <span class="hidden xl:inline">Battery</span>
@@ -57,6 +99,7 @@ export class Navbar {
                                     <i class="fa-solid fa-bell text-xs"></i>
                                     <span class="hidden xl:inline">Alerts</span>
                                 </a>
+                                `}
                             </div>
                             `}
                         </div>
@@ -108,31 +151,58 @@ export class Navbar {
                         ${isAuthenticated ? `
                         <div class="w-full">
                             <div class="text-center mb-6">
-                                <h2 class="text-pagani-gold font-orbitron text-lg uppercase tracking-wider">EV Control Center</h2>
+                                <h2 class="text-pagani-gold font-orbitron text-lg uppercase tracking-wider">${portalMode === 'factory' ? 'Factory Control Center' : 'EV Control Center'}</h2>
                                 <div class="w-16 h-0.5 bg-pagani-gold mx-auto mt-2"></div>
                             </div>
                             <div class="grid grid-cols-2 gap-4 mb-6">
-                                <a href="/dashboard" class="mobile-nav-card flex flex-col items-center justify-center gap-3 p-6 border border-pagani-gold/30 rounded-xl hover:bg-pagani-gold/10 hover:border-pagani-gold transition-all duration-300 min-h-[100px]">
+                                <a href="${dashboardPath}" class="mobile-nav-card flex flex-col items-center justify-center gap-3 p-6 border border-pagani-gold/30 rounded-xl hover:bg-pagani-gold/10 hover:border-pagani-gold transition-all duration-300 min-h-[100px]">
                                     <i class="fa-solid fa-gauge-high text-3xl text-pagani-gold"></i>
-                                    <span class="text-xs uppercase tracking-wider text-center">Dashboard</span>
+                                    <span class="text-xs uppercase tracking-wider text-center">${portalMode === 'factory' ? 'Factory' : 'Dashboard'}</span>
                                 </a>
+                                ${portalMode === 'factory' ? `
+                                <a href="/alerts" class="mobile-nav-card flex flex-col items-center justify-center gap-3 p-6 border border-pagani-gold/30 rounded-xl hover:bg-pagani-gold/10 hover:border-pagani-gold transition-all duration-300 min-h-[100px]">
+                                    <i class="fa-solid fa-bell text-3xl text-pagani-gold"></i>
+                                    <span class="text-xs uppercase tracking-wider text-center">Incidents</span>
+                                </a>
+                                ` : `
                                 <a href="/battery" class="mobile-nav-card flex flex-col items-center justify-center gap-3 p-6 border border-pagani-gold/30 rounded-xl hover:bg-pagani-gold/10 hover:border-pagani-gold transition-all duration-300 min-h-[100px]">
                                     <i class="fa-solid fa-car-battery text-3xl text-pagani-gold"></i>
                                     <span class="text-xs uppercase tracking-wider text-center">Battery</span>
                                 </a>
+                                `}
                                 <a href="/rag-chat" class="mobile-nav-card flex flex-col items-center justify-center gap-3 p-6 border border-pagani-gold/30 rounded-xl hover:bg-pagani-gold/10 hover:border-pagani-gold transition-all duration-300 min-h-[100px]">
                                     <i class="fa-solid fa-robot text-3xl text-pagani-gold"></i>
-                                    <span class="text-xs uppercase tracking-wider text-center">AI Chat</span>
+                                    <span class="text-xs uppercase tracking-wider text-center">${portalMode === 'factory' ? 'AI Ops' : 'AI Chat'}</span>
                                 </a>
+                                ${portalMode === 'factory' ? `
+                                <a href="/dashboard" class="mobile-nav-card flex flex-col items-center justify-center gap-3 p-6 border border-pagani-gold/30 rounded-xl hover:bg-pagani-gold/10 hover:border-pagani-gold transition-all duration-300 min-h-[100px]">
+                                    <i class="fa-solid fa-car-side text-3xl text-pagani-gold"></i>
+                                    <span class="text-xs uppercase tracking-wider text-center">EV Dashboard</span>
+                                </a>
+                                ` : ''}
+                                ${portalMode === 'factory' ? `
+                                <a href="/gallery" class="mobile-nav-card flex flex-col items-center justify-center gap-3 p-6 border border-pagani-gold/30 rounded-xl hover:bg-pagani-gold/10 hover:border-pagani-gold transition-all duration-300 min-h-[100px]">
+                                    <i class="fa-solid fa-camera text-3xl text-pagani-gold"></i>
+                                    <span class="text-xs uppercase tracking-wider text-center">Camera Wall</span>
+                                </a>
+                                ` : `
                                 <a href="/map" class="mobile-nav-card flex flex-col items-center justify-center gap-3 p-6 border border-pagani-gold/30 rounded-xl hover:bg-pagani-gold/10 hover:border-pagani-gold transition-all duration-300 min-h-[100px]">
                                     <i class="fa-solid fa-route text-3xl text-pagani-gold"></i>
                                     <span class="text-xs uppercase tracking-wider text-center">Routes</span>
                                 </a>
+                                `}
                             </div>
+                            ${portalMode === 'factory' ? `
+                            <a href="/profile" class="mobile-nav-card w-full flex items-center justify-center gap-4 p-4 border border-pagani-gold/30 rounded-xl hover:bg-pagani-gold/10 hover:border-pagani-gold transition-all duration-300">
+                                <i class="fa-solid fa-user text-2xl text-pagani-gold"></i>
+                                <span class="text-sm uppercase tracking-wider">Operator Settings</span>
+                            </a>
+                            ` : `
                             <a href="/alerts" class="mobile-nav-card w-full flex items-center justify-center gap-4 p-4 border border-pagani-gold/30 rounded-xl hover:bg-pagani-gold/10 hover:border-pagani-gold transition-all duration-300">
                                 <i class="fa-solid fa-bell text-2xl text-pagani-gold"></i>
                                 <span class="text-sm uppercase tracking-wider">Smart Alerts & Notifications</span>
                             </a>
+                            `}
                         </div>
                         ` : ''}
                         <div class="flex flex-col gap-4 w-full mt-8">

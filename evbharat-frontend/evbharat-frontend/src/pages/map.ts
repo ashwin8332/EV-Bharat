@@ -25,6 +25,21 @@ interface RouteOption {
     recommended: boolean;
 }
 
+declare global {
+    interface Window {
+        mapboxgl?: any;
+    }
+}
+
+const envMapboxToken = (import.meta.env.VITE_MAPBOX_API_KEY as string | undefined)?.trim();
+const MAPBOX_TOKEN = envMapboxToken && envMapboxToken.length > 0
+    ? envMapboxToken
+    : 'pk.eyJ1Ijoic3Rhc2gxMiIsImEiOiJjbW1qY3FwbnowNnRyMnJzYWhvNnZuN3dwIn0.UdkyD-K7763L-JaB7j79Kg';
+
+let mapboxMap: any = null;
+let mapboxOriginMarker: any = null;
+let mapboxDestinationMarker: any = null;
+
 export async function renderMapPage() {
     // Check if user is authenticated
     if (!authService.isAuthenticated()) {
@@ -151,10 +166,10 @@ export async function renderMapPage() {
                         <!-- Map Container -->
                         <div class="bg-gradient-to-br from-gray-900 to-pagani-black border border-pagani-gold/20 rounded-xl overflow-hidden fade-in-section" style="animation-delay: 150ms">
                             <div class="relative h-[400px] lg:h-[450px] bg-gray-800">
-                                <!-- Real Google Map -->
-                                <div id="google-map" class="absolute inset-0"></div>
+                                <!-- Map container -->
+                                <div id="google-map" style="position:absolute;top:0;left:0;width:100%;height:100%"></div>
                                 <!-- Loading overlay (shown until map loads) -->
-                                <div id="map-loading" class="absolute inset-0 flex items-center justify-center bg-gray-900/80 z-10">
+                                <div id="map-loading" class="absolute inset-0 flex items-center justify-center bg-gray-900/80" style="z-index:10">
                                     <div class="text-center">
                                         <i class="fa-solid fa-spinner animate-spin text-pagani-gold text-3xl mb-3"></i>
                                         <p class="text-gray-400 text-sm font-orbitron">Loading Map...</p>
@@ -299,11 +314,118 @@ export async function renderMapPage() {
     // Initialize map page functionality
     setTimeout(async () => {
         initializeMapPage();
-        await loadGoogleMap();
-        // Setup autocomplete AFTER Google Maps is loaded
-        setupLocationInputs();
+        await loadMapboxMap();
     }, 100);
 }
+
+async function loadMapboxMap() {
+    try {
+        if (!MAPBOX_TOKEN || !MAPBOX_TOKEN.startsWith('pk.')) {
+            throw new Error('Invalid Mapbox public token. Set VITE_MAPBOX_API_KEY to a valid public key (pk...).');
+        }
+
+        if (!document.querySelector('link[href*="mapbox-gl.css"]')) {
+            const css = document.createElement('link');
+            css.rel = 'stylesheet';
+            css.href = 'https://api.mapbox.com/mapbox-gl-js/v3.6.0/mapbox-gl.css';
+            document.head.appendChild(css);
+        }
+
+        if (!window.mapboxgl) {
+            await new Promise<void>((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://api.mapbox.com/mapbox-gl-js/v3.6.0/mapbox-gl.js';
+                script.async = true;
+                script.onload = () => resolve();
+                script.onerror = () => reject(new Error('Failed to load Mapbox GL script.'));
+                document.head.appendChild(script);
+            });
+        }
+
+        if (!window.mapboxgl) {
+            throw new Error('Mapbox GL is unavailable.');
+        }
+
+        window.mapboxgl.accessToken = MAPBOX_TOKEN;
+
+        const container = document.getElementById('google-map');
+        if (!container) {
+            throw new Error('Map container not found.');
+        }
+
+        if (mapboxMap) {
+            mapboxMap.remove();
+            mapboxMap = null;
+            mapboxOriginMarker = null;
+            mapboxDestinationMarker = null;
+        }
+
+        // Remove loading overlay before creating map so it doesn't block the view
+        const loading = document.getElementById('map-loading');
+        if (loading) loading.remove();
+
+        // Ensure container has explicit dimensions for Mapbox
+        container.style.position = 'absolute';
+        container.style.inset = '0';
+        container.style.width = '100%';
+        container.style.height = '100%';
+
+        mapboxMap = new window.mapboxgl.Map({
+            container,
+            style: 'mapbox://styles/mapbox/dark-v11',
+            center: [76.5, 27.5],
+            zoom: 7,
+            attributionControl: true,
+        });
+
+        mapboxMap.addControl(new window.mapboxgl.NavigationControl(), 'top-right');
+        mapboxMap.addControl(new window.mapboxgl.FullscreenControl(), 'top-right');
+
+        mapboxMap.on('error', (event: { error?: { message?: string } }) => {
+            const message = event?.error?.message ?? 'Unknown Mapbox error';
+            console.error('[EVBharat Maps] Mapbox error:', message);
+        });
+
+        mapboxMap.on('load', () => {
+            // Ensure proper sizing when route page mounts during layout transitions.
+            requestAnimationFrame(() => mapboxMap?.resize());
+            setTimeout(() => mapboxMap?.resize(), 300);
+            setTimeout(() => mapboxMap?.resize(), 1200);
+
+            // Seed charging station markers on map
+            CHARGING_STATIONS.forEach((station) => {
+                const el = document.createElement('div');
+                el.style.width = '12px';
+                el.style.height = '12px';
+                el.style.borderRadius = '9999px';
+                el.style.background = '#22d3ee';
+                el.style.border = '2px solid #0a0a0a';
+
+                const popup = new window.mapboxgl.Popup({ offset: 14 }).setHTML(`
+                    <div style="color:#0f172a;font-family:sans-serif">
+                        <strong>${station.name}</strong><br>
+                        <span style="font-size:12px">${station.address}</span>
+                    </div>
+                `);
+
+                new window.mapboxgl.Marker(el)
+                    .setLngLat([station.lng, station.lat])
+                    .setPopup(popup)
+                    .addTo(mapboxMap);
+            });
+        });
+
+        // Retry resize in case container layout wasn't ready
+        setTimeout(() => mapboxMap?.resize(), 500);
+        setTimeout(() => mapboxMap?.resize(), 2000);
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error('[EVBharat Maps]', msg);
+        showMapError(msg);
+    }
+}
+
+
 
 // ── Google Maps loader ───────────────────────────────────────────────
 let googleMap: google.maps.Map | null = null;
@@ -407,7 +529,7 @@ async function loadGoogleMap() {
 function showMapError(detail: string) {
     const loading = document.getElementById('map-loading');
     if (loading) {
-        const isKeyError = detail.toLowerCase().includes('api key') || detail.toLowerCase().includes('script failed');
+        const isKeyError = detail.toLowerCase().includes('token') || detail.toLowerCase().includes('api key') || detail.toLowerCase().includes('script failed');
         const isBackendError = detail.toLowerCase().includes('endpoint') || detail.toLowerCase().includes('port 3001');
         
         let troubleSteps = '';
@@ -420,12 +542,12 @@ function showMapError(detail: string) {
         } else if (isKeyError) {
             troubleSteps = `
                 <div style="text-align:left;margin-top:12px;font-size:11px;color:#fbbf24;background:rgba(0,0,0,0.3);padding:8px;border-radius:6px">
-                    <strong>✓ API Key Fix:</strong>
+                    <strong>✓ Mapbox Token Fix:</strong>
                     <ol style="margin:6px 0 0 16px;padding:0">
-                        <li>Go to <a href="https://console.cloud.google.com/apis/library" target="_blank" style="color:#60a5fa">Google Cloud Console</a></li>
-                        <li>Enable: Maps JavaScript API, Street View API, Places API</li>
-                        <li>Verify API key has billing enabled</li>
-                        <li>Update GOOGLE_MAPS_API_KEY in backend/.env</li>
+                        <li>Go to <a href="https://account.mapbox.com/access-tokens/" target="_blank" style="color:#60a5fa">Mapbox Access Tokens</a></li>
+                        <li>Create or copy a public token that starts with <code style="background:rgba(0,0,0,0.5);padding:2px 6px;border-radius:3px">pk.</code></li>
+                        <li>Set <code style="background:rgba(0,0,0,0.5);padding:2px 6px;border-radius:3px">VITE_MAPBOX_API_KEY</code> in frontend .env</li>
+                        <li>Restart frontend dev server</li>
                     </ol>
                 </div>
             `;
@@ -639,6 +761,25 @@ function initializeMapPage() {
         calculateDynamicRoute();
     });
 
+    // Connect input fields directly to the map with quick location preview.
+    const startInput = document.getElementById('start-location') as HTMLInputElement | null;
+    const endInput = document.getElementById('end-location') as HTMLInputElement | null;
+    if (startInput && endInput) {
+        const previewStart = async () => previewLocationOnMap(startInput.value, 'origin');
+        const previewEnd = async () => previewLocationOnMap(endInput.value, 'destination');
+
+        startInput.addEventListener('change', previewStart);
+        endInput.addEventListener('change', previewEnd);
+        startInput.addEventListener('blur', previewStart);
+        endInput.addEventListener('blur', previewEnd);
+
+        const onEnter = (e: KeyboardEvent) => {
+            if (e.key === 'Enter') calculateDynamicRoute();
+        };
+        startInput.addEventListener('keydown', onEnter);
+        endInput.addEventListener('keydown', onEnter);
+    }
+
     // Add current location button
     addCurrentLocationButton();
 
@@ -807,117 +948,183 @@ function calculateDynamicRoute() {
     
     calculateBtn.innerHTML = '<i class="fa-solid fa-spinner animate-spin mr-2"></i> Calculating...';
     
-    if (typeof google !== 'undefined' && googleMap && directionsRenderer) {
-        const directionsService = new google.maps.DirectionsService();
-        const geocoder = new google.maps.Geocoder();
-        
-        // Geocode both locations for accurate routing
+    if (mapboxMap && window.mapboxgl) {
         Promise.all([
-            geocodeLocation(geocoder, origin),
-            geocodeLocation(geocoder, destination)
-        ]).then(([originResult, destResult]) => {
-            if (originResult && destResult) {
-                // Update markers with geocoded positions
-                updateOriginMarker(originResult.geometry.location, originResult.formatted_address);
-                updateDestinationMarker(destResult.geometry.location, destResult.formatted_address);
-                
-                // Calculate route using Google Directions API
-                directionsService.route({
-                    origin: originResult.geometry.location,
-                    destination: destResult.geometry.location,
-                    travelMode: google.maps.TravelMode.DRIVING,
-                    unitSystem: google.maps.UnitSystem.METRIC,
-                }, (result, status) => {
-                    if (status === google.maps.DirectionsStatus.OK && result) {
-                        directionsRenderer!.setDirections(result);
-                        
-                        // Update trip analysis
-                        const leg = result.routes[0]?.legs[0];
-                        if (leg) {
-                            const distance = Math.round((leg.distance?.value ?? 0) / 1000);
-                            const durationText = leg.duration?.text ?? '';
-                            const kmEl = document.querySelector('[data-trip="km"]');
-                            const durEl = document.querySelector('[data-trip="dur"]');
-                            const energyEl = document.querySelector('[data-trip="energy"]');
-                            const stopsEl = document.querySelector('[data-trip="stops"]');
-                            
-                            if (kmEl) kmEl.textContent = String(distance);
-                            if (durEl) durEl.textContent = durationText;
-                            
-                            const estimatedEnergy = Math.round(distance * 0.2);
-                            if (energyEl) energyEl.textContent = `${estimatedEnergy} kWh`;
-                            
-                            const currentRange = 392;
-                            const estimatedStops = distance > currentRange ? Math.ceil((distance - currentRange) / 300) : 0;
-                            if (stopsEl) stopsEl.textContent = String(estimatedStops);
-                            
-                            // Update battery status notification
-                            const batteryNotification = document.querySelector('.bg-blue-500\\/10 p, .bg-green-500\\/10 p, .bg-yellow-500\\/10 p');
-                            if (batteryNotification) {
-                                if (estimatedStops === 0) {
-                                    batteryNotification.innerHTML = `
-                                        <i class="fa-solid fa-check-circle mr-1"></i>
-                                        Your current range covers this ${distance}km trip without charging stops needed.
-                                    `;
-                                    batteryNotification.parentElement!.className = 'mt-4 p-3 bg-green-500/10 border border-green-500/30 rounded-lg';
-                                    batteryNotification.className = 'text-xs text-green-400';
-                                } else {
-                                    batteryNotification.innerHTML = `
-                                        <i class="fa-solid fa-lightbulb mr-1"></i>
-                                        Your ${distance}km trip will need ${estimatedStops} charging stop${estimatedStops > 1 ? 's' : ''}.
-                                    `;
-                                    batteryNotification.parentElement!.className = 'mt-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg';
-                                    batteryNotification.className = 'text-xs text-yellow-400';
-                                }
-                            }
-
-                            // Update route options dynamically
-                            updateRouteOptions(distance, durationText);
-                        }
-                        
-                        // Fit map to route
-                        const bounds = new google.maps.LatLngBounds();
-                        bounds.extend(originResult.geometry.location);
-                        bounds.extend(destResult.geometry.location);
-                        googleMap!.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
-                        
-                        const originName = originResult.address_components?.[0]?.long_name ?? 'Origin';
-                        const destName = destResult.address_components?.[0]?.long_name ?? 'Destination';
-                        calculateBtn.innerHTML = '<i class="fa-solid fa-check mr-2"></i> Route Calculated!';
-                        showNotification(`Route from ${originName} to ${destName} calculated`, 'success');
-
-                        // Fetch weather for origin & destination
-                        fetchRouteWeather(
-                            originResult.geometry.location.lat(),
-                            originResult.geometry.location.lng(),
-                            destResult.geometry.location.lat(),
-                            destResult.geometry.location.lng(),
-                            originName,
-                            destName
-                        );
-                    } else {
-                        handleRouteError(status);
-                    }
-                    
-                    setTimeout(() => {
-                        calculateBtn.innerHTML = '<i class="fa-solid fa-magnifying-glass-location mr-2"></i> Calculate Route';
-                    }, 3000);
-                });
-            } else {
+            geocodeMapbox(origin),
+            geocodeMapbox(destination),
+        ]).then(async ([originGeo, destGeo]) => {
+            if (!originGeo || !destGeo) {
                 calculateBtn.innerHTML = '<i class="fa-solid fa-exclamation-triangle mr-2"></i> Invalid Locations';
                 showNotification('Could not find one or both locations. Please check spelling.', 'error');
                 resetTripAnalysis();
                 setTimeout(() => {
                     calculateBtn.innerHTML = '<i class="fa-solid fa-magnifying-glass-location mr-2"></i> Calculate Route';
                 }, 3000);
+                return;
             }
+
+            const route = await getRouteMapbox(originGeo.center, destGeo.center);
+            if (!route) {
+                calculateBtn.innerHTML = '<i class="fa-solid fa-exclamation-triangle mr-2"></i> Route Failed';
+                showNotification('No route found between these locations', 'error');
+                resetTripAnalysis();
+                setTimeout(() => {
+                    calculateBtn.innerHTML = '<i class="fa-solid fa-magnifying-glass-location mr-2"></i> Calculate Route';
+                }, 3000);
+                return;
+            }
+
+            addOrMoveMapboxMarker('origin', originGeo.center, '#22c55e');
+            addOrMoveMapboxMarker('destination', destGeo.center, '#ef4444');
+            drawMapboxRoute(route.geometry);
+
+            const distance = Math.round(route.distance / 1000);
+            const durationText = formatMinutes(Math.round(route.duration / 60));
+            const kmEl = document.querySelector('[data-trip="km"]');
+            const durEl = document.querySelector('[data-trip="dur"]');
+            const energyEl = document.querySelector('[data-trip="energy"]');
+            const stopsEl = document.querySelector('[data-trip="stops"]');
+
+            if (kmEl) kmEl.textContent = String(distance);
+            if (durEl) durEl.textContent = durationText;
+
+            const estimatedEnergy = Math.round(distance * 0.2);
+            if (energyEl) energyEl.textContent = `${estimatedEnergy} kWh`;
+
+            const currentRange = 392;
+            const estimatedStops = distance > currentRange ? Math.ceil((distance - currentRange) / 300) : 0;
+            if (stopsEl) stopsEl.textContent = String(estimatedStops);
+
+            updateRouteOptions(distance, durationText);
+
+            calculateBtn.innerHTML = '<i class="fa-solid fa-check mr-2"></i> Route Calculated!';
+            showNotification(`Route from ${originGeo.name} to ${destGeo.name} calculated`, 'success');
+
+            fetchRouteWeather(
+                originGeo.center[1],
+                originGeo.center[0],
+                destGeo.center[1],
+                destGeo.center[0],
+                originGeo.name,
+                destGeo.name
+            );
+
+            setTimeout(() => {
+                calculateBtn.innerHTML = '<i class="fa-solid fa-magnifying-glass-location mr-2"></i> Calculate Route';
+            }, 3000);
         });
     } else {
-        showNotification('Map not loaded yet. Please wait and try again.', 'error');
+        showNotification('Mapbox map not loaded yet. Please wait and try again.', 'error');
         setTimeout(() => {
             calculateBtn.innerHTML = '<i class="fa-solid fa-magnifying-glass-location mr-2"></i> Calculate Route';
         }, 2000);
     }
+}
+
+async function previewLocationOnMap(raw: string, kind: 'origin' | 'destination') {
+    const query = raw.trim();
+    if (!query || !mapboxMap || !window.mapboxgl) return;
+
+    const resolved = await geocodeMapbox(query);
+    if (!resolved) return;
+
+    addOrMoveMapboxMarker(kind, resolved.center, kind === 'origin' ? '#22c55e' : '#ef4444');
+    mapboxMap.flyTo({ center: resolved.center, zoom: 10, duration: 900 });
+}
+
+async function geocodeMapbox(query: string): Promise<{ center: [number, number]; name: string } | null> {
+    try {
+        const coord = parseCoordinateInput(query);
+        if (coord) {
+            return {
+                center: [coord.lng, coord.lat],
+                name: `${coord.lat.toFixed(5)}, ${coord.lng.toFixed(5)}`,
+            };
+        }
+
+        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&country=IN&limit=1`;
+        const res = await fetch(url);
+        if (!res.ok) return null;
+        const data = await res.json();
+        const feature = data?.features?.[0];
+        if (!feature?.center) return null;
+        return { center: feature.center as [number, number], name: feature.place_name || query };
+    } catch {
+        return null;
+    }
+}
+
+function parseCoordinateInput(value: string): { lat: number; lng: number } | null {
+    const parts = value.split(',').map((p) => p.trim());
+    if (parts.length !== 2) return null;
+
+    const lat = Number(parts[0]);
+    const lng = Number(parts[1]);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+
+    return { lat, lng };
+}
+
+async function getRouteMapbox(origin: [number, number], destination: [number, number]) {
+    try {
+        const coords = `${origin[0]},${origin[1]};${destination[0]},${destination[1]}`;
+        const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${coords}?geometries=geojson&overview=full&steps=false&access_token=${MAPBOX_TOKEN}`;
+        const res = await fetch(url);
+        if (!res.ok) return null;
+        const data = await res.json();
+        return data?.routes?.[0] || null;
+    } catch {
+        return null;
+    }
+}
+
+function addOrMoveMapboxMarker(kind: 'origin' | 'destination', center: [number, number], color: string) {
+    if (!mapboxMap || !window.mapboxgl) return;
+
+    const markerRef = kind === 'origin' ? mapboxOriginMarker : mapboxDestinationMarker;
+    if (markerRef) {
+        markerRef.setLngLat(center);
+        return;
+    }
+
+    const marker = new window.mapboxgl.Marker({ color })
+        .setLngLat(center)
+        .addTo(mapboxMap);
+
+    if (kind === 'origin') mapboxOriginMarker = marker;
+    else mapboxDestinationMarker = marker;
+}
+
+function drawMapboxRoute(geometry: GeoJSON.LineString) {
+    if (!mapboxMap || !window.mapboxgl) return;
+
+    const sourceId = 'route-line';
+    if (mapboxMap.getLayer(sourceId)) mapboxMap.removeLayer(sourceId);
+    if (mapboxMap.getSource(sourceId)) mapboxMap.removeSource(sourceId);
+
+    mapboxMap.addSource(sourceId, {
+        type: 'geojson',
+        data: {
+            type: 'Feature',
+            geometry,
+            properties: {},
+        },
+    });
+
+    mapboxMap.addLayer({
+        id: sourceId,
+        type: 'line',
+        source: sourceId,
+        paint: {
+            'line-color': '#22d3ee',
+            'line-width': 5,
+            'line-opacity': 0.9,
+        },
+    });
+
+    const bounds = geometry.coordinates.reduce((b: any, coord: number[]) => b.extend(coord), new window.mapboxgl.LngLatBounds(geometry.coordinates[0], geometry.coordinates[0]));
+    mapboxMap.fitBounds(bounds, { padding: 50, duration: 900 });
 }
 
 function geocodeLocation(geocoder: google.maps.Geocoder, address: string): Promise<google.maps.GeocoderResult | null> {
@@ -960,6 +1167,10 @@ function handleRouteError(status: google.maps.DirectionsStatus) {
     showNotification(message, 'error');
     resetTripAnalysis();
 }
+
+// Retained during staged migration so Google fallback logic can be restored quickly if needed.
+const __legacyGoogleMapFns = [loadGoogleMap, setupLocationInputs, geocodeLocation, handleRouteError];
+void __legacyGoogleMapFns;
 
 
 
@@ -1015,23 +1226,12 @@ function addCurrentLocationButton() {
                     navigator.geolocation.getCurrentPosition((position) => {
                         const lat = position.coords.latitude;
                         const lng = position.coords.longitude;
-                        
-                        if (typeof google !== 'undefined') {
-                            const geocoder = new google.maps.Geocoder();
-                            geocoder.geocode({
-                                location: { lat, lng }
-                            }, (results, status) => {
-                                button.innerHTML = '<i class="fa-solid fa-location-crosshairs text-sm"></i>';
-                                
-                                if (status === google.maps.GeocoderStatus.OK && results?.[0]) {
-                                    (startInput as HTMLInputElement).value = results[0].formatted_address;
-                                    updateOriginMarker(new google.maps.LatLng(lat, lng), 'Current Location');
-                                    showNotification('Current location detected', 'success');
-                                } else {
-                                    showNotification('Could not determine address from location', 'error');
-                                }
-                            });
-                        }
+
+                        button.innerHTML = '<i class="fa-solid fa-location-crosshairs text-sm"></i>';
+                        (startInput as HTMLInputElement).value = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+                        addOrMoveMapboxMarker('origin', [lng, lat], '#22c55e');
+                        if (mapboxMap) mapboxMap.flyTo({ center: [lng, lat], zoom: 12 });
+                        showNotification('Current location detected', 'success');
                     }, (_error) => {
                         button.innerHTML = '<i class="fa-solid fa-location-crosshairs text-sm"></i>';
                         showNotification('Location access denied or unavailable', 'error');
@@ -1096,16 +1296,64 @@ interface WeatherData {
 }
 
 async function fetchWeather(lat: number, lng: number): Promise<WeatherData | null> {
+    // Try backend first, fall back to direct OpenWeatherMap call
     const apiBase = import.meta.env.VITE_API_BASE_URL ?? '';
     try {
         const res = await fetch(`${apiBase}/api/weather?lat=${lat}&lng=${lng}`);
-        if (!res.ok) throw new Error(`Weather API returned ${res.status}`);
+        if (res.ok) {
+            const data = await res.json();
+            if (data.success && data.weather) return data.weather;
+        }
+    } catch {
+        // Backend unavailable — use direct API below
+    }
+
+    // Direct OpenWeatherMap free-tier call (no key needed for limited use via proxy)
+    // Using Open-Meteo (free, no API key required) as reliable fallback
+    try {
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,visibility&wind_speed_unit=kmh`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Open-Meteo returned ${res.status}`);
         const data = await res.json();
-        return data.success ? data.weather : null;
+        const c = data.current;
+        if (!c) return null;
+
+        // Map WMO weather codes to descriptions and icons
+        const wmoInfo = getWMOWeatherInfo(c.weather_code ?? 0);
+
+        return {
+            main: {
+                temp: c.temperature_2m ?? 25,
+                feels_like: c.apparent_temperature ?? c.temperature_2m ?? 25,
+                humidity: c.relative_humidity_2m ?? 50,
+            },
+            weather: [{
+                description: wmoInfo.description,
+                icon: wmoInfo.icon,
+                main: wmoInfo.main,
+            }],
+            wind: { speed: (c.wind_speed_10m ?? 0) / 3.6 }, // convert km/h to m/s for consistency
+            visibility: (c.visibility ?? 10000),
+            name: '',
+        };
     } catch (err) {
         console.error('[EVBharat] Weather fetch error:', err);
         return null;
     }
+}
+
+function getWMOWeatherInfo(code: number): { description: string; icon: string; main: string } {
+    // WMO weather interpretation codes → human-readable + icon
+    if (code === 0) return { description: 'Clear sky', icon: '01d', main: 'Clear' };
+    if (code <= 3) return { description: 'Partly cloudy', icon: '02d', main: 'Clouds' };
+    if (code <= 49) return { description: 'Foggy', icon: '50d', main: 'Fog' };
+    if (code <= 59) return { description: 'Drizzle', icon: '09d', main: 'Drizzle' };
+    if (code <= 69) return { description: 'Rain', icon: '10d', main: 'Rain' };
+    if (code <= 79) return { description: 'Snow', icon: '13d', main: 'Snow' };
+    if (code <= 82) return { description: 'Rain showers', icon: '09d', main: 'Rain' };
+    if (code <= 86) return { description: 'Snow showers', icon: '13d', main: 'Snow' };
+    if (code <= 99) return { description: 'Thunderstorm', icon: '11d', main: 'Thunderstorm' };
+    return { description: 'Unknown', icon: '01d', main: 'Clear' };
 }
 
 function getWeatherAdvisory(weather: WeatherData): { text: string; icon: string; color: string } {

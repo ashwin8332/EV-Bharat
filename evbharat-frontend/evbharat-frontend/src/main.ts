@@ -16,6 +16,7 @@ import { renderRAGChatPage } from './pages/rag-chat';
 import { renderMapPage } from './pages/map';
 import { renderAlertPage } from './pages/alerts';
 import { renderProfilePage } from './pages/profile';
+import { renderFactoryDashboardPage } from './pages/factory-dashboard';
 import { render404Page } from './pages/404';
 
 // Initialize loader
@@ -34,6 +35,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     router.register('/gallery', 'Gallery | EVBharat', renderGalleryPage);
     router.register('/auth', 'Login | EVBharat', renderAuthPage);
     router.register('/dashboard', 'Dashboard | EVBharat', renderDashboardPage);
+    router.register('/factory-dashboard', 'Dark Factory | EVBharat', renderFactoryDashboardPage);
     router.register('/battery', 'Battery Management | EVBharat', renderBatteryPage);
     router.register('/battery-analytics', 'AI Battery Analytics | EVBharat', renderBatteryAnalyticsPage);
     router.register('/rag-chat', 'AI Assistant | EVBharat', renderRAGChatPage);
