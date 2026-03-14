@@ -4,10 +4,14 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch src/index.js",
-    "start": "node src/index.js"
+    "start": "concurrently -k -n api,rag,ml -c cyan,green,yellow \"npm run start:api\" \"npm run start:rag\" \"npm run start:ml\"",
+    "start:api": "node src/index.js",
+    "start:rag": "cd \"EVBharat Bot\" && uvicorn rag_api:app --host 0.0.0.0 --port 8001 --reload",
+    "start:ml": "python run_ml_backend.py"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
+    "concurrently": "^9.2.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
