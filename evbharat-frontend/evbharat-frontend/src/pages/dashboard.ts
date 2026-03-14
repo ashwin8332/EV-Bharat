@@ -1,6 +1,24 @@
 import { authService } from '../utils/auth';
 import { bluetoothService } from '../utils/bluetooth-service';
 
+const DEFAULT_ESP32_CAM_URL = 'http://192.168.1.11/cam-hi.jpg';
+const CAMERA_URL_STORAGE_KEY = 'evbharat_esp32_cam_url';
+let camViewInterval: ReturnType<typeof setInterval> | null = null;
+
+interface CameraDetectionPrediction {
+    bbox: [number, number, number, number];
+    class: string;
+    score: number;
+}
+
+interface CocoSsdModel {
+    detect: (img: HTMLImageElement) => Promise<CameraDetectionPrediction[]>;
+}
+
+interface CocoSsdGlobal {
+    load: (config?: { base?: string }) => Promise<CocoSsdModel>;
+}
+
 export async function renderDashboardPage() {
     // Check if user is authenticated
     if (!authService.isAuthenticated()) {
@@ -147,6 +165,73 @@ export async function renderDashboardPage() {
                                     </div>
                                 </div>
                             </div>
+                        </div>
+
+                        <!-- ESP32-CAM View -->
+                        <div class="bg-gradient-to-br from-gray-900 to-pagani-black border border-pagani-gold/20 rounded-xl p-6 fade-in-section">
+                            <div class="flex items-center justify-between mb-4 gap-3">
+                                <h3 class="text-lg font-orbitron font-bold flex items-center gap-2">
+                                    <i class="fa-solid fa-camera text-cyan-400"></i>
+                                    Live Cam View
+                                </h3>
+                                <div class="flex items-center gap-2 px-3 py-1 rounded-full border border-cyan-500/40 bg-cyan-500/10">
+                                    <span id="cam-status-dot" class="w-2 h-2 rounded-full bg-red-500"></span>
+                                    <span id="cam-status-text" class="text-xs text-cyan-300">Offline</span>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-2 mb-4">
+                                <input
+                                    id="cam-url-input"
+                                    type="text"
+                                    class="w-full px-3 py-2 bg-gray-800/60 border border-cyan-500/30 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400 transition-all"
+                                    placeholder="ESP32-CAM URL (e.g. http://192.168.1.11/cam-hi.jpg)"
+                                />
+                                <button id="cam-save-url" class="px-3 py-2 bg-cyan-500/15 border border-cyan-500/40 rounded-lg text-cyan-300 text-sm hover:bg-cyan-500/25 transition-all">
+                                    Save
+                                </button>
+                                <button id="cam-toggle-btn" class="px-3 py-2 bg-cyan-500 text-black font-semibold rounded-lg text-sm hover:bg-cyan-400 transition-all">
+                                    Start
+                                </button>
+                            </div>
+
+                            <div class="flex flex-wrap items-center gap-2 mb-4">
+                                <span class="text-[11px] uppercase tracking-wider text-gray-500">Resolution:</span>
+                                <button data-cam-path="/cam-lo.jpg" class="px-2 py-1 border border-cyan-500/40 rounded text-xs text-cyan-300 hover:bg-cyan-500/15 transition-all">Low (320x240)</button>
+                                <button data-cam-path="/cam-mid.jpg" class="px-2 py-1 border border-cyan-500/40 rounded text-xs text-cyan-300 hover:bg-cyan-500/15 transition-all">Mid (640x480)</button>
+                                <button data-cam-path="/cam-hi.jpg" class="px-2 py-1 border border-cyan-500/40 rounded text-xs text-cyan-300 hover:bg-cyan-500/15 transition-all">High (800x600)</button>
+                            </div>
+
+                            <div class="flex items-center justify-between mb-4 p-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 gap-3">
+                                <div>
+                                    <p class="text-xs text-emerald-300 font-orbitron uppercase tracking-wide">Object Detection</p>
+                                    <p id="cam-detection-status" class="text-[11px] text-gray-400 mt-1">Off</p>
+                                </div>
+                                <button id="cam-detection-btn" class="px-3 py-2 bg-emerald-500/20 border border-emerald-500/50 rounded-lg text-emerald-300 text-sm hover:bg-emerald-500/30 transition-all">
+                                    Enable Detection
+                                </button>
+                            </div>
+
+                            <div class="relative overflow-hidden rounded-xl border border-cyan-500/20 bg-black/60 aspect-video">
+                                <img
+                                    id="cam-feed"
+                                    alt="ESP32-CAM feed"
+                                    class="w-full h-full object-cover"
+                                    loading="lazy"
+                                />
+                                <canvas
+                                    id="cam-overlay"
+                                    class="absolute inset-0 w-full h-full pointer-events-none"
+                                ></canvas>
+                                <div class="absolute inset-0 pointer-events-none border border-cyan-300/20 rounded-xl"></div>
+                                <div class="absolute top-3 left-3 px-2 py-1 bg-black/70 border border-cyan-500/50 rounded text-[11px] font-orbitron text-cyan-300 uppercase tracking-wider">
+                                    ESP32-CAM
+                                </div>
+                            </div>
+
+                            <p class="text-xs text-gray-500 mt-3">
+                                Supports ESP32 endpoints: /cam-lo.jpg, /cam-mid.jpg, /cam-hi.jpg. This view auto-refreshes frames similar to the Python ESP32 fetch loop.
+                            </p>
                         </div>
 
                         ${!isFactoryPortal ? `
@@ -535,6 +620,9 @@ function initializeDashboard() {
     // Bluetooth Vehicle Control
     initializeVehicleControl();
 
+    // ESP32 camera view
+    initializeCamView();
+
     // Animate stats on scroll
     const animateSections = document.querySelectorAll('.fade-in-section');
     const observer = new IntersectionObserver((entries) => {
@@ -546,6 +634,415 @@ function initializeDashboard() {
     }, { threshold: 0.1 });
 
     animateSections.forEach(section => observer.observe(section));
+}
+
+function initializeCamView() {
+    const camFeed = document.getElementById('cam-feed') as HTMLImageElement | null;
+    const camOverlay = document.getElementById('cam-overlay') as HTMLCanvasElement | null;
+    const camUrlInput = document.getElementById('cam-url-input') as HTMLInputElement | null;
+    const camSaveBtn = document.getElementById('cam-save-url') as HTMLButtonElement | null;
+    const camToggleBtn = document.getElementById('cam-toggle-btn') as HTMLButtonElement | null;
+    const camDetectionBtn = document.getElementById('cam-detection-btn') as HTMLButtonElement | null;
+    const camPathButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-cam-path]'));
+    const camDetectionStatus = document.getElementById('cam-detection-status');
+    const camStatusDot = document.getElementById('cam-status-dot');
+    const camStatusText = document.getElementById('cam-status-text');
+
+    if (!camFeed || !camOverlay || !camUrlInput || !camSaveBtn || !camToggleBtn || !camDetectionBtn || !camDetectionStatus || !camStatusDot || !camStatusText) {
+        return;
+    }
+
+    const cocoSsdWindow = window as Window & { cocoSsd?: CocoSsdGlobal };
+
+    const loadScript = (src: string) => {
+        const existing = document.querySelector(`script[src="${src}"]`) as HTMLScriptElement | null;
+        if (existing) {
+            if (existing.dataset.loaded === 'true') {
+                return Promise.resolve();
+            }
+            return new Promise<void>((resolve, reject) => {
+                existing.addEventListener('load', () => resolve(), { once: true });
+                existing.addEventListener('error', () => reject(new Error(`Failed loading script: ${src}`)), { once: true });
+            });
+        }
+
+        return new Promise<void>((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = src;
+            script.async = true;
+            script.onload = () => {
+                script.dataset.loaded = 'true';
+                resolve();
+            };
+            script.onerror = () => reject(new Error(`Failed loading script: ${src}`));
+            document.head.appendChild(script);
+        });
+    };
+
+    const getSanitizedUrl = (url: string) => {
+        const trimmed = url.trim();
+        if (!trimmed) return '';
+        if (/^https?:\/\//i.test(trimmed)) return trimmed;
+        return `http://${trimmed}`;
+    };
+
+    const normalizeCommonCameraTypos = (url: string) => {
+        return url
+            .replace('/com-hi.jpg', '/cam-hi.jpg')
+            .replace('/camhi.jpg', '/cam-hi.jpg')
+            .replace('/cam-mid.jpeg', '/cam-mid.jpg')
+            .replace('/cam-lo.jpeg', '/cam-lo.jpg')
+            .replace('/cam-hi.jpeg', '/cam-hi.jpg');
+    };
+
+    const ensureCameraPath = (url: string) => {
+        try {
+            const parsed = new URL(url);
+            const pathname = parsed.pathname.toLowerCase();
+            const hasKnownPath = /\/cam-(lo|mid|hi)\.jpg$/.test(pathname);
+            const hasAnyJpegPath = pathname.endsWith('.jpg') || pathname.endsWith('.jpeg');
+
+            if (!pathname || pathname === '/' || (!hasKnownPath && !hasAnyJpegPath)) {
+                parsed.pathname = '/cam-hi.jpg';
+            }
+
+            return parsed.toString();
+        } catch {
+            return url;
+        }
+    };
+
+    const setCameraPath = (url: string, path: string) => {
+        try {
+            const parsed = new URL(url);
+            parsed.pathname = path;
+            return parsed.toString();
+        } catch {
+            return url;
+        }
+    };
+
+    const setStatus = (isOnline: boolean, text: string) => {
+        camStatusText.textContent = text;
+        camStatusDot.classList.remove('bg-red-500', 'bg-green-500', 'animate-pulse');
+        if (isOnline) {
+            camStatusDot.classList.add('bg-green-500', 'animate-pulse');
+            camStatusText.classList.remove('text-red-300');
+            camStatusText.classList.add('text-cyan-300');
+            return;
+        }
+
+        camStatusDot.classList.add('bg-red-500');
+        camStatusText.classList.add('text-red-300');
+    };
+
+    const buildFrameUrl = (baseUrl: string) => {
+        const now = Date.now();
+        const params = new URLSearchParams({
+            url: baseUrl,
+            t: String(now)
+        });
+        return `/api/camera/frame?${params.toString()}`;
+    };
+
+    const readProxyErrorMessage = async (response: Response) => {
+        try {
+            const data = await response.json() as { message?: string };
+            return data.message || `Camera error (${response.status})`;
+        } catch {
+            return `Camera error (${response.status})`;
+        }
+    };
+
+    const validateCameraEndpoint = async (baseUrl: string) => {
+        const proxyUrl = buildFrameUrl(baseUrl);
+        const response = await fetch(proxyUrl, { method: 'GET', cache: 'no-store' });
+        if (!response.ok) {
+            const message = await readProxyErrorMessage(response);
+            return { ok: false, message };
+        }
+
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.toLowerCase().includes('image/')) {
+            return { ok: false, message: 'Camera response is not an image.' };
+        }
+
+        return { ok: true, message: 'Ready' };
+    };
+
+    const overlayContext = camOverlay.getContext('2d');
+    let detectionModel: CocoSsdModel | null = null;
+    let isDetectionEnabled = false;
+    let isDetectorLoading = false;
+    let detectionInFlight = false;
+    let lastDetectionAt = 0;
+
+    const setDetectionStatus = (status: string) => {
+        camDetectionStatus.textContent = status;
+    };
+
+    const syncOverlaySize = () => {
+        const width = camFeed.clientWidth;
+        const height = camFeed.clientHeight;
+        if (!width || !height) return;
+        if (camOverlay.width !== width || camOverlay.height !== height) {
+            camOverlay.width = width;
+            camOverlay.height = height;
+        }
+    };
+
+    const clearOverlay = () => {
+        if (!overlayContext) return;
+        overlayContext.clearRect(0, 0, camOverlay.width, camOverlay.height);
+    };
+
+    const drawDetections = (predictions: CameraDetectionPrediction[]) => {
+        if (!overlayContext) return;
+
+        syncOverlaySize();
+        clearOverlay();
+
+        const naturalWidth = camFeed.naturalWidth || 1;
+        const naturalHeight = camFeed.naturalHeight || 1;
+        const scaleX = camOverlay.width / naturalWidth;
+        const scaleY = camOverlay.height / naturalHeight;
+
+        overlayContext.lineWidth = 2;
+        overlayContext.strokeStyle = '#22d3ee';
+        overlayContext.font = '12px Orbitron, sans-serif';
+        overlayContext.textBaseline = 'top';
+
+        predictions.forEach((prediction) => {
+            const [x, y, width, height] = prediction.bbox;
+            const sx = x * scaleX;
+            const sy = y * scaleY;
+            const sw = width * scaleX;
+            const sh = height * scaleY;
+            const label = `${prediction.class.toUpperCase()} ${(prediction.score * 100).toFixed(0)}%`;
+
+            overlayContext.strokeRect(sx, sy, sw, sh);
+
+            const labelPadding = 4;
+            const textWidth = overlayContext.measureText(label).width;
+            const textHeight = 14;
+
+            overlayContext.fillStyle = 'rgba(15, 23, 42, 0.85)';
+            overlayContext.fillRect(sx, Math.max(0, sy - textHeight - 4), textWidth + labelPadding * 2, textHeight + 4);
+            overlayContext.fillStyle = '#34d399';
+            overlayContext.fillText(label, sx + labelPadding, Math.max(0, sy - textHeight - 2));
+        });
+    };
+
+    const maybeDetectObjects = async () => {
+        if (!isDetectionEnabled || !detectionModel || !isStreaming || detectionInFlight) {
+            return;
+        }
+
+        const now = Date.now();
+        if (now - lastDetectionAt < 1000) {
+            return;
+        }
+
+        detectionInFlight = true;
+        lastDetectionAt = now;
+
+        try {
+            const predictions = await detectionModel.detect(camFeed);
+            drawDetections(predictions);
+            setDetectionStatus(predictions.length > 0 ? `Detected ${predictions.length} object(s)` : 'No objects detected');
+        } catch {
+            setDetectionStatus('Detection error');
+        } finally {
+            detectionInFlight = false;
+        }
+    };
+
+    const ensureDetectionModel = async () => {
+        if (detectionModel) {
+            return true;
+        }
+
+        if (isDetectorLoading) {
+            return false;
+        }
+
+        isDetectorLoading = true;
+        setDetectionStatus('Loading model...');
+
+        try {
+            await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js');
+            await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js');
+
+            if (!cocoSsdWindow.cocoSsd) {
+                throw new Error('COCO-SSD script not available');
+            }
+
+            detectionModel = await cocoSsdWindow.cocoSsd.load({ base: 'lite_mobilenet_v2' });
+            setDetectionStatus('Model ready');
+            return true;
+        } catch {
+            setDetectionStatus('Model load failed');
+            return false;
+        } finally {
+            isDetectorLoading = false;
+        }
+    };
+
+    let cameraUrl = ensureCameraPath(normalizeCommonCameraTypos(getSanitizedUrl(localStorage.getItem(CAMERA_URL_STORAGE_KEY) || DEFAULT_ESP32_CAM_URL)));
+    let isStreaming = false;
+
+    camUrlInput.value = cameraUrl;
+
+    if (camViewInterval) {
+        clearInterval(camViewInterval);
+        camViewInterval = null;
+    }
+
+    const requestFrame = () => {
+        if (!cameraUrl) {
+            setStatus(false, 'No URL');
+            return;
+        }
+        camFeed.src = buildFrameUrl(cameraUrl);
+    };
+
+    camFeed.addEventListener('load', () => {
+        syncOverlaySize();
+        if (isStreaming) {
+            setStatus(true, 'Online');
+        }
+        void maybeDetectObjects();
+    });
+
+    camFeed.addEventListener('error', () => {
+        clearOverlay();
+        setStatus(false, 'Unable to load');
+    });
+
+    const startStream = async () => {
+        if (!cameraUrl) {
+            setStatus(false, 'No URL');
+            return;
+        }
+
+        setStatus(false, 'Checking...');
+        const validation = await validateCameraEndpoint(cameraUrl);
+        if (!validation.ok) {
+            setStatus(false, validation.message);
+            return;
+        }
+
+        if (camViewInterval) {
+            clearInterval(camViewInterval);
+        }
+
+        isStreaming = true;
+        camToggleBtn.textContent = 'Stop';
+        camToggleBtn.classList.remove('bg-cyan-500', 'hover:bg-cyan-400', 'text-black');
+        camToggleBtn.classList.add('bg-red-600', 'hover:bg-red-500', 'text-white');
+
+        requestFrame();
+        camViewInterval = setInterval(requestFrame, 250);
+    };
+
+    const stopStream = () => {
+        isStreaming = false;
+
+        if (camViewInterval) {
+            clearInterval(camViewInterval);
+            camViewInterval = null;
+        }
+
+        clearOverlay();
+        camToggleBtn.textContent = 'Start';
+        camToggleBtn.classList.remove('bg-red-600', 'hover:bg-red-500', 'text-white');
+        camToggleBtn.classList.add('bg-cyan-500', 'hover:bg-cyan-400', 'text-black');
+
+        setStatus(false, 'Stopped');
+    };
+
+    const applyCameraUrl = () => {
+        const nextUrl = ensureCameraPath(normalizeCommonCameraTypos(getSanitizedUrl(camUrlInput.value)));
+        camUrlInput.value = nextUrl;
+        cameraUrl = nextUrl;
+        localStorage.setItem(CAMERA_URL_STORAGE_KEY, nextUrl);
+
+        if (!nextUrl) {
+            stopStream();
+            setStatus(false, 'No URL');
+            return;
+        }
+
+        if (isStreaming) {
+            void startStream();
+        } else {
+            setStatus(false, 'Ready');
+        }
+    };
+
+    camSaveBtn.addEventListener('click', applyCameraUrl);
+    camUrlInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            applyCameraUrl();
+        }
+    });
+
+    camToggleBtn.addEventListener('click', () => {
+        if (isStreaming) {
+            stopStream();
+        } else {
+            void startStream();
+        }
+    });
+
+    camPathButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+            const selectedPath = button.dataset.camPath || '/cam-hi.jpg';
+            const baseUrl = ensureCameraPath(normalizeCommonCameraTypos(getSanitizedUrl(camUrlInput.value || cameraUrl || DEFAULT_ESP32_CAM_URL)));
+            const nextUrl = setCameraPath(baseUrl, selectedPath);
+
+            cameraUrl = nextUrl;
+            camUrlInput.value = nextUrl;
+            localStorage.setItem(CAMERA_URL_STORAGE_KEY, nextUrl);
+
+            if (isStreaming) {
+                void startStream();
+            } else {
+                setStatus(false, 'Ready');
+            }
+        });
+    });
+
+    camDetectionBtn.addEventListener('click', async () => {
+        if (isDetectionEnabled) {
+            isDetectionEnabled = false;
+            clearOverlay();
+            camDetectionBtn.textContent = 'Enable Detection';
+            camDetectionBtn.classList.remove('bg-red-500/20', 'border-red-500/50', 'text-red-300');
+            camDetectionBtn.classList.add('bg-emerald-500/20', 'border-emerald-500/50', 'text-emerald-300');
+            setDetectionStatus('Off');
+            return;
+        }
+
+        const modelReady = await ensureDetectionModel();
+        if (!modelReady) {
+            return;
+        }
+
+        isDetectionEnabled = true;
+        camDetectionBtn.textContent = 'Disable Detection';
+        camDetectionBtn.classList.remove('bg-emerald-500/20', 'border-emerald-500/50', 'text-emerald-300');
+        camDetectionBtn.classList.add('bg-red-500/20', 'border-red-500/50', 'text-red-300');
+        setDetectionStatus('Detection active');
+        void maybeDetectObjects();
+    });
+
+    if (cameraUrl) {
+        void startStream();
+    } else {
+        setStatus(false, 'No URL');
+    }
 }
 
 function initializeVehicleControl() {

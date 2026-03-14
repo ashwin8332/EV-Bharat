@@ -452,6 +452,69 @@ app.post('/api/contact', async (req, res) => {
   }
 });
 
+// ── GET /api/camera/frame – proxy ESP32 camera image ──
+app.get('/api/camera/frame', async (req, res) => {
+  const { url } = req.query;
+
+  if (!url || typeof url !== 'string') {
+    return res.status(400).json({ success: false, message: 'url query param is required.' });
+  }
+
+  let target;
+  try {
+    target = new URL(url);
+  } catch {
+    return res.status(400).json({ success: false, message: 'Invalid camera URL.' });
+  }
+
+  if (!['http:', 'https:'].includes(target.protocol)) {
+    return res.status(400).json({ success: false, message: 'Only http/https camera URLs are allowed.' });
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+
+  try {
+    const response = await fetch(target.toString(), {
+      method: 'GET',
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'EVBharat-Camera-Proxy/1.0'
+      }
+    });
+
+    if (!response.ok) {
+      return res.status(502).json({
+        success: false,
+        message: `Camera fetch failed with status ${response.status}.`
+      });
+    }
+
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.toLowerCase().includes('image/')) {
+      return res.status(502).json({ success: false, message: 'Camera response is not an image.' });
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Content-Type', contentType);
+    return res.status(200).send(buffer);
+  } catch (error) {
+    const isAbortError = error instanceof Error && error.name === 'AbortError';
+    if (isAbortError) {
+      return res.status(504).json({ success: false, message: 'Camera request timed out.' });
+    }
+
+    console.error('Camera proxy error:', error);
+    return res.status(500).json({ success: false, message: 'Camera proxy server error.' });
+  } finally {
+    clearTimeout(timeout);
+  }
+});
+
 // ── GET /api/weather – proxy OpenWeatherMap API ──
 app.get('/api/weather', async (req, res) => {
   const { lat, lng } = req.query;
