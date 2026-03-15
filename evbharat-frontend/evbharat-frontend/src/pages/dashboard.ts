@@ -3,7 +3,12 @@ import { bluetoothService } from '../utils/bluetooth-service';
 
 const DEFAULT_ESP32_CAM_URL = 'http://192.168.1.11/cam-hi.jpg';
 const CAMERA_URL_STORAGE_KEY = 'evbharat_esp32_cam_url';
-let camViewInterval: ReturnType<typeof setInterval> | null = null;
+const CAMERA_MODE_STORAGE_KEY = 'evbharat_cam_mode';
+const DEFAULT_YOLO_STREAM_URL = ((import.meta.env.VITE_YOLO_STREAM_URL as string | undefined)?.trim() || 'http://localhost:8000/stream');
+
+type CameraMode = 'direct' | 'yolo';
+
+let camViewInterval: ReturnType<typeof setTimeout> | null = null;
 
 export async function renderDashboardPage() {
     // Check if user is authenticated
@@ -188,6 +193,13 @@ export async function renderDashboardPage() {
                                 <button data-cam-path="/cam-hi.jpg" class="px-2 py-1 border border-cyan-500/40 rounded text-xs text-cyan-300 hover:bg-cyan-500/15 transition-all">High (800x600)</button>
                             </div>
 
+                            <div class="flex flex-wrap items-center gap-2 mb-4">
+                                <span class="text-[11px] uppercase tracking-wider text-gray-500">Mode:</span>
+                                <button id="cam-mode-direct" class="px-2 py-1 border border-cyan-500/40 rounded text-xs text-cyan-300 hover:bg-cyan-500/15 transition-all">Direct Feed</button>
+                                <button id="cam-mode-yolo" class="px-2 py-1 border border-cyan-500/40 rounded text-xs text-cyan-300 hover:bg-cyan-500/15 transition-all">YOLO Detection</button>
+                                <span class="text-[11px] text-gray-500 truncate">Proxy: ${DEFAULT_YOLO_STREAM_URL}</span>
+                            </div>
+
                             <div class="relative overflow-hidden rounded-xl border border-cyan-500/20 bg-black/60 aspect-video">
                                 <img
                                     id="cam-feed"
@@ -202,7 +214,7 @@ export async function renderDashboardPage() {
                             </div>
 
                             <p class="text-xs text-gray-500 mt-3">
-                                Detection: Idle. Supports ESP32 endpoints: /cam-lo.jpg, /cam-mid.jpg, /cam-hi.jpg. This view auto-refreshes frames similar to the Python ESP32 fetch loop.
+                                Toggle YOLO Detection Mode to proxy frames through ${DEFAULT_YOLO_STREAM_URL} for live bounding boxes, or keep Direct Feed to pull directly from your ESP32 endpoint.
                             </p>
                         </div>
 
@@ -614,6 +626,8 @@ function initializeCamView() {
     const camSaveBtn = document.getElementById('cam-save-url') as HTMLButtonElement | null;
     const camToggleBtn = document.getElementById('cam-toggle-btn') as HTMLButtonElement | null;
     const camPathButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-cam-path]'));
+    const camModeDirectBtn = document.getElementById('cam-mode-direct') as HTMLButtonElement | null;
+    const camModeYoloBtn = document.getElementById('cam-mode-yolo') as HTMLButtonElement | null;
     const camStatusDot = document.getElementById('cam-status-dot');
     const camStatusText = document.getElementById('cam-status-text');
 
@@ -690,6 +704,36 @@ function initializeCamView() {
         }
     };
 
+    const buildYoloStreamUrl = (baseUrl: string) => {
+        const connector = DEFAULT_YOLO_STREAM_URL.includes('?') ? '&' : '?';
+        return `${DEFAULT_YOLO_STREAM_URL}${connector}source=${encodeURIComponent(baseUrl)}&ts=${Date.now()}`;
+    };
+
+    const setToggleState = (streaming: boolean) => {
+        if (streaming) {
+            camToggleBtn.textContent = 'Stop';
+            camToggleBtn.classList.remove('bg-cyan-500', 'hover:bg-cyan-400', 'text-black');
+            camToggleBtn.classList.add('bg-red-600', 'hover:bg-red-500', 'text-white');
+        } else {
+            camToggleBtn.textContent = 'Start';
+            camToggleBtn.classList.remove('bg-red-600', 'hover:bg-red-500', 'text-white');
+            camToggleBtn.classList.add('bg-cyan-500', 'hover:bg-cyan-400', 'text-black');
+        }
+    };
+
+    const applyModeButtonState = (button: HTMLButtonElement | null, active: boolean) => {
+        if (!button) return;
+        button.classList.toggle('bg-cyan-500', active);
+        button.classList.toggle('text-black', active);
+        button.classList.toggle('text-cyan-300', !active);
+        button.classList.toggle('border-cyan-500', active);
+        button.classList.toggle('border-cyan-500/40', !active);
+        button.classList.toggle('font-semibold', active);
+    };
+
+    const storedMode = localStorage.getItem(CAMERA_MODE_STORAGE_KEY);
+    const isValidMode = (mode: string | null): mode is CameraMode => mode === 'direct' || mode === 'yolo';
+    let camMode: CameraMode = isValidMode(storedMode) ? storedMode : 'direct';
 
     let cameraUrl = ensureCameraPath(normalizeCommonCameraTypos(getSanitizedUrl(localStorage.getItem(CAMERA_URL_STORAGE_KEY) || DEFAULT_ESP32_CAM_URL)));
     let isStreaming = false;
@@ -698,11 +742,15 @@ function initializeCamView() {
     camUrlInput.value = cameraUrl;
 
     if (camViewInterval) {
-        clearInterval(camViewInterval);
+        clearTimeout(camViewInterval);
         camViewInterval = null;
     }
 
     const requestFrame = () => {
+        if (camMode !== 'direct') {
+            return;
+        }
+
         if (!cameraUrl) {
             setStatus(false, 'No URL');
             return;
@@ -717,7 +765,7 @@ function initializeCamView() {
     };
 
     const scheduleNextFrame = (delayMs = 100) => {
-        if (!isStreaming) {
+        if (!isStreaming || camMode !== 'direct') {
             return;
         }
 
@@ -730,58 +778,70 @@ function initializeCamView() {
         }, delayMs);
     };
 
-    camFeed.addEventListener('load', () => {
-        frameRequestInFlight = false;
-        if (isStreaming) {
-            setStatus(true, 'Online');
-            scheduleNextFrame(80);
+    const stopTimers = () => {
+        if (camViewInterval) {
+            clearTimeout(camViewInterval);
+            camViewInterval = null;
         }
-    });
-
-    camFeed.addEventListener('error', () => {
         frameRequestInFlight = false;
-        setStatus(false, 'Unable to load');
-        scheduleNextFrame(500);
-    });
+    };
 
-    const startStream = async () => {
+    const updateModeButtons = () => {
+        applyModeButtonState(camModeDirectBtn, camMode === 'direct');
+        applyModeButtonState(camModeYoloBtn, camMode === 'yolo');
+    };
+
+    const startDirectStream = () => {
+        stopTimers();
         if (!cameraUrl) {
             setStatus(false, 'No URL');
             return;
         }
 
+        isStreaming = true;
+        setToggleState(true);
         setStatus(false, 'Connecting...');
+        requestFrame();
+    };
 
-        frameRequestInFlight = false;
-
-        if (camViewInterval) {
-            clearTimeout(camViewInterval);
-            camViewInterval = null;
+    const startYoloStream = () => {
+        stopTimers();
+        if (!cameraUrl) {
+            setStatus(false, 'No URL');
+            return;
         }
 
         isStreaming = true;
-        camToggleBtn.textContent = 'Stop';
-        camToggleBtn.classList.remove('bg-cyan-500', 'hover:bg-cyan-400', 'text-black');
-        camToggleBtn.classList.add('bg-red-600', 'hover:bg-red-500', 'text-white');
+        setToggleState(true);
+        setStatus(false, 'YOLO connecting...');
+        camFeed.src = buildYoloStreamUrl(cameraUrl);
+    };
 
-        requestFrame();
+    const startStream = () => {
+        if (camMode === 'yolo') {
+            startYoloStream();
+        } else {
+            startDirectStream();
+        }
     };
 
     const stopStream = () => {
         isStreaming = false;
-
-        if (camViewInterval) {
-            clearTimeout(camViewInterval);
-            camViewInterval = null;
-        }
-
-        frameRequestInFlight = false;
-
-        camToggleBtn.textContent = 'Start';
-        camToggleBtn.classList.remove('bg-red-600', 'hover:bg-red-500', 'text-white');
-        camToggleBtn.classList.add('bg-cyan-500', 'hover:bg-cyan-400', 'text-black');
-
+        stopTimers();
+        camFeed.removeAttribute('src');
+        setToggleState(false);
         setStatus(false, 'Stopped');
+    };
+
+    const setCameraMode = (mode: CameraMode) => {
+        camMode = mode;
+        localStorage.setItem(CAMERA_MODE_STORAGE_KEY, mode);
+        updateModeButtons();
+        if (isStreaming) {
+            startStream();
+        } else {
+            setStatus(false, mode === 'yolo' ? 'YOLO ready' : 'Ready');
+        }
     };
 
     const applyCameraUrl = () => {
@@ -797,11 +857,49 @@ function initializeCamView() {
         }
 
         if (isStreaming) {
-            void startStream();
+            startStream();
         } else {
-            setStatus(false, 'Ready');
+            setStatus(false, camMode === 'yolo' ? 'YOLO ready' : 'Ready');
         }
     };
+
+    camFeed.addEventListener('load', () => {
+        frameRequestInFlight = false;
+        if (!isStreaming) {
+            return;
+        }
+
+        if (camMode === 'direct') {
+            setStatus(true, 'Online');
+            scheduleNextFrame(80);
+        } else {
+            setStatus(true, 'YOLO active');
+        }
+    });
+
+    camFeed.addEventListener('error', () => {
+        frameRequestInFlight = false;
+        const offlineText = camMode === 'yolo' ? 'YOLO proxy unavailable' : 'Unable to load';
+        setStatus(false, offlineText);
+
+        if (!isStreaming) {
+            return;
+        }
+
+        if (camMode === 'direct') {
+            scheduleNextFrame(500);
+        } else {
+            if (camViewInterval) {
+                clearTimeout(camViewInterval);
+            }
+
+            camViewInterval = setTimeout(() => {
+                if (isStreaming && camMode === 'yolo') {
+                    camFeed.src = buildYoloStreamUrl(cameraUrl);
+                }
+            }, 1500);
+        }
+    });
 
     camSaveBtn.addEventListener('click', applyCameraUrl);
     camUrlInput.addEventListener('keydown', (event) => {
@@ -815,9 +913,12 @@ function initializeCamView() {
         if (isStreaming) {
             stopStream();
         } else {
-            void startStream();
+            startStream();
         }
     });
+
+    camModeDirectBtn?.addEventListener('click', () => setCameraMode('direct'));
+    camModeYoloBtn?.addEventListener('click', () => setCameraMode('yolo'));
 
     camPathButtons.forEach((button) => {
         button.addEventListener('click', () => {
@@ -830,15 +931,17 @@ function initializeCamView() {
             localStorage.setItem(CAMERA_URL_STORAGE_KEY, nextUrl);
 
             if (isStreaming) {
-                void startStream();
+                startStream();
             } else {
-                setStatus(false, 'Ready');
+                setStatus(false, camMode === 'yolo' ? 'YOLO ready' : 'Ready');
             }
         });
     });
 
+    updateModeButtons();
+
     if (cameraUrl) {
-        void startStream();
+        startStream();
     } else {
         setStatus(false, 'No URL');
     }
