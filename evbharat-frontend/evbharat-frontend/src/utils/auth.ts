@@ -1,4 +1,4 @@
-// Mock Authentication Service
+// Authentication service with optional offline fallback
 export interface User {
     id: string;
     email: string;
@@ -47,7 +47,36 @@ export interface AuthResult {
 class AuthService {
     private storageKey = 'evbharat_auth';
     private userKey = 'evbharat_user';
-    private apiBase = import.meta.env.VITE_API_BASE_URL ?? '';
+    private apiBase = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
+    private enableOfflineAuth = import.meta.env.VITE_ENABLE_OFFLINE_AUTH === 'true';
+    private debugMode = import.meta.env.DEV;
+
+    constructor() {
+        if (!this.debugMode) return;
+
+        if (this.apiBase) {
+            console.log('Auth Service: backend base URL =', this.apiBase);
+        } else {
+            console.log('Auth Service: using same-origin /api (Vite proxy in dev)');
+        }
+
+        if (this.enableOfflineAuth) {
+            console.warn('Auth Service: offline mock auth is ENABLED (VITE_ENABLE_OFFLINE_AUTH=true)');
+        }
+    }
+
+    private getAuthEndpoints(path: string): string[] {
+        if (this.apiBase) {
+            return [`${this.apiBase}${path}`];
+        }
+
+        return [
+            path,
+            `http://127.0.0.1:3001${path}`,
+            `http://localhost:3001${path}`,
+            `http://host.docker.internal:3001${path}`
+        ];
+    }
 
     /**
      * Get current authentication state
@@ -129,10 +158,12 @@ class AuthService {
     }
 
     private async requestAuth(path: string, payload: Record<string, string>): Promise<AuthResult> {
-        // Try real API first (if backend is available)
-        if (this.apiBase) {
+        const endpoints = this.getAuthEndpoints(path);
+        let hadNetworkError = false;
+
+        for (const endpoint of endpoints) {
             try {
-                const response = await fetch(`${this.apiBase}${path}`, {
+                const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -150,13 +181,45 @@ class AuthService {
                         user: data?.user
                     };
                 }
+
+                // Retry on gateway/proxy upstream failure, otherwise trust backend response.
+                if ([502, 503, 504].includes(response.status)) {
+                    hadNetworkError = true;
+                    if (this.debugMode) {
+                        console.warn(`Auth Service: upstream unavailable via ${endpoint} (${response.status})`);
+                    }
+                    continue;
+                }
+
+                if (!response.ok) {
+                    return {
+                        success: false,
+                        message: data?.message ?? 'Authentication failed. Please try again.'
+                    };
+                }
+
+                return {
+                    success: false,
+                    message: 'Authentication response is invalid. Please try again.'
+                };
             } catch (error) {
-                // Backend not available, fall through to mock auth
-                console.log('Backend not available, using offline authentication');
+                hadNetworkError = true;
+                if (this.debugMode) {
+                    console.warn(`Auth Service: network error via ${endpoint}`, error);
+                }
             }
         }
 
-        // Fallback: Mock authentication (works offline)
+        if (hadNetworkError) {
+            if (!this.enableOfflineAuth) {
+                return {
+                    success: false,
+                    message: 'Cannot reach authentication server. Please check backend and try again.'
+                };
+            }
+        }
+
+        // Optional fallback: mock authentication (offline demo mode)
         if (path.includes('login')) {
             // Mock login - accept any credentials
             const mockUser: User = {

@@ -4,6 +4,7 @@ export class Navbar {
     private navbar: HTMLElement | null = null;
     private mobileMenu: HTMLElement | null = null;
     private isMenuOpen: boolean = false;
+    private readonly languageStorageKey = 'evbharat_language';
 
     constructor() {
         this.render();
@@ -35,6 +36,58 @@ export class Navbar {
                 .factory-mode .hover\\:text-black:hover { color: #020617 !important; }
             </style>
             ` : ''}
+            <style id="language-selector-theme">
+                .language-select {
+                    width: 11rem;
+                    color: #f8fafc;
+                    background-color: rgba(2, 6, 23, 0.25);
+                    border: 1px solid rgba(234, 179, 8, 0.35);
+                    border-radius: 0.5rem;
+                    padding: 0.35rem 2rem 0.35rem 0.75rem;
+                    font-size: 0.875rem;
+                    line-height: 1.25rem;
+                    appearance: none;
+                    -webkit-appearance: none;
+                    -moz-appearance: none;
+                    background-image: linear-gradient(45deg, transparent 50%, #eab308 50%), linear-gradient(135deg, #eab308 50%, transparent 50%);
+                    background-position: calc(100% - 16px) calc(50% - 2px), calc(100% - 11px) calc(50% - 2px);
+                    background-size: 5px 5px, 5px 5px;
+                    background-repeat: no-repeat;
+                    transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+                }
+
+                .language-select:hover {
+                    border-color: rgba(234, 179, 8, 0.7);
+                    background-color: rgba(2, 6, 23, 0.4);
+                }
+
+                .language-select:focus {
+                    outline: none;
+                    border-color: rgba(234, 179, 8, 0.9);
+                    box-shadow: 0 0 0 2px rgba(234, 179, 8, 0.2);
+                }
+
+                .language-select option {
+                    color: #f8fafc;
+                    background-color: #0b1220;
+                }
+
+                .mobile-language-select {
+                    width: 100%;
+                    max-width: 13rem;
+                }
+
+                .factory-mode .language-select {
+                    border-color: rgba(34, 211, 238, 0.45);
+                    background-image: linear-gradient(45deg, transparent 50%, #22d3ee 50%), linear-gradient(135deg, #22d3ee 50%, transparent 50%);
+                }
+
+                .factory-mode .language-select:hover,
+                .factory-mode .language-select:focus {
+                    border-color: rgba(34, 211, 238, 0.8);
+                    box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.2);
+                }
+            </style>
             <nav class="fixed top-0 left-0 w-full z-50 px-4 md:px-8 py-3 md:py-4 transition-all duration-300 ${isFactoryMode ? 'factory-mode' : ''}" id="navbar">
                 <div class="max-w-7xl mx-auto">
                     <div class="flex items-center justify-between">
@@ -106,6 +159,49 @@ export class Navbar {
 
                         <!-- User Menu (Desktop) - Right Aligned -->
                         <div class="hidden md:flex items-center gap-3 lg:gap-4 flex-shrink-0 z-10">
+                            <label class="flex items-center gap-2 px-3 py-2 border border-pagani-gold/30 rounded-lg bg-pagani-black/30 hover:border-pagani-gold/60 transition-colors" aria-label="Select language">
+                                <i class="fa-solid fa-language text-pagani-gold text-sm"></i>
+                                <select id="language-select" class="language-select" title="Select language">
+                                    <option value="en">English</option>
+                                    <option value="hi">Hindi</option>
+                                    <option value="bn">Bengali</option>
+                                    <option value="as">Assamese</option>
+                                    <option value="or">Odia</option>
+                                    <option value="ur">Urdu</option>
+                                    <option value="ne">Nepali</option>
+                                    <option value="sd">Sindhi</option>
+                                    <option value="ta">Tamil</option>
+                                    <option value="te">Telugu</option>
+                                    <option value="mr">Marathi</option>
+                                    <option value="gu">Gujarati</option>
+                                    <option value="kn">Kannada</option>
+                                    <option value="ml">Malayalam</option>
+                                    <option value="pa">Punjabi</option>
+                                    <option value="ar">Arabic</option>
+                                    <option value="fr">French</option>
+                                    <option value="de">German</option>
+                                    <option value="es">Spanish</option>
+                                    <option value="pt">Portuguese</option>
+                                    <option value="ru">Russian</option>
+                                    <option value="ja">Japanese</option>
+                                    <option value="ko">Korean</option>
+                                    <option value="zh-CN">Chinese (Simplified)</option>
+                                    <option value="zh-TW">Chinese (Traditional)</option>
+                                    <option value="it">Italian</option>
+                                    <option value="nl">Dutch</option>
+                                    <option value="tr">Turkish</option>
+                                    <option value="pl">Polish</option>
+                                    <option value="vi">Vietnamese</option>
+                                    <option value="id">Indonesian</option>
+                                    <option value="th">Thai</option>
+                                    <option value="fa">Persian</option>
+                                    <option value="uk">Ukrainian</option>
+                                    <option value="el">Greek</option>
+                                    <option value="sv">Swedish</option>
+                                    <option value="da">Danish</option>
+                                    <option value="fi">Finnish</option>
+                                </select>
+                            </label>
                             ${isAuthenticated ? `
                             <a href="/profile" class="flex items-center gap-2 lg:gap-3 px-3 lg:px-4 py-2 border border-pagani-gold/30 rounded-lg bg-pagani-black/20 backdrop-blur-sm hover:border-pagani-gold hover:bg-pagani-gold/10 transition-all duration-300 group">
                                 <div class="text-right hidden md:block">
@@ -206,6 +302,49 @@ export class Navbar {
                         </div>
                         ` : ''}
                         <div class="flex flex-col gap-4 w-full mt-8">
+                            <label class="w-full flex items-center justify-between gap-3 px-4 py-3 border border-pagani-gold/30 rounded-lg bg-pagani-black/20" aria-label="Select language">
+                                <span class="text-xs uppercase tracking-[0.2em] text-pagani-gold">Language</span>
+                                <select id="mobile-language-select" class="language-select mobile-language-select" title="Select language">
+                                    <option value="en">English</option>
+                                    <option value="hi">Hindi</option>
+                                    <option value="bn">Bengali</option>
+                                    <option value="as">Assamese</option>
+                                    <option value="or">Odia</option>
+                                    <option value="ur">Urdu</option>
+                                    <option value="ne">Nepali</option>
+                                    <option value="sd">Sindhi</option>
+                                    <option value="ta">Tamil</option>
+                                    <option value="te">Telugu</option>
+                                    <option value="mr">Marathi</option>
+                                    <option value="gu">Gujarati</option>
+                                    <option value="kn">Kannada</option>
+                                    <option value="ml">Malayalam</option>
+                                    <option value="pa">Punjabi</option>
+                                    <option value="ar">Arabic</option>
+                                    <option value="fr">French</option>
+                                    <option value="de">German</option>
+                                    <option value="es">Spanish</option>
+                                    <option value="pt">Portuguese</option>
+                                    <option value="ru">Russian</option>
+                                    <option value="ja">Japanese</option>
+                                    <option value="ko">Korean</option>
+                                    <option value="zh-CN">Chinese (Simplified)</option>
+                                    <option value="zh-TW">Chinese (Traditional)</option>
+                                    <option value="it">Italian</option>
+                                    <option value="nl">Dutch</option>
+                                    <option value="tr">Turkish</option>
+                                    <option value="pl">Polish</option>
+                                    <option value="vi">Vietnamese</option>
+                                    <option value="id">Indonesian</option>
+                                    <option value="th">Thai</option>
+                                    <option value="fa">Persian</option>
+                                    <option value="uk">Ukrainian</option>
+                                    <option value="el">Greek</option>
+                                    <option value="sv">Swedish</option>
+                                    <option value="da">Danish</option>
+                                    <option value="fi">Finnish</option>
+                                </select>
+                            </label>
                             ${isAuthenticated ? `
                                 <a href="/profile" class="text-center py-3 border border-pagani-gold/30 rounded-lg hover:border-pagani-gold hover:bg-pagani-gold/10 transition-all duration-300 mobile-nav-link">
                                     <p class="text-xs text-gray-400 uppercase tracking-wider">Profile Settings</p>
@@ -232,6 +371,7 @@ export class Navbar {
         document.body.insertAdjacentHTML('afterbegin', navbarHTML);
         this.navbar = document.getElementById('navbar');
         this.mobileMenu = document.getElementById('mobile-menu');
+        this.initializeGoogleTranslate();
     }
 
     private attachEventListeners() {
@@ -245,6 +385,24 @@ export class Navbar {
         // Mobile menu toggle
         const menuBtn = document.getElementById('mobile-menu-btn');
         menuBtn?.addEventListener('click', () => this.toggleMobileMenu());
+
+        const languageSelect = document.getElementById('language-select') as HTMLSelectElement | null;
+        const mobileLanguageSelect = document.getElementById('mobile-language-select') as HTMLSelectElement | null;
+        const savedLanguage = localStorage.getItem(this.languageStorageKey) || 'en';
+
+        if (languageSelect) {
+            languageSelect.value = savedLanguage;
+            languageSelect.addEventListener('change', (event) => {
+                this.handleLanguageChange((event.target as HTMLSelectElement).value);
+            });
+        }
+
+        if (mobileLanguageSelect) {
+            mobileLanguageSelect.value = savedLanguage;
+            mobileLanguageSelect.addEventListener('change', (event) => {
+                this.handleLanguageChange((event.target as HTMLSelectElement).value);
+            });
+        }
 
         // Close menu on link click
         const mobileLinks = document.querySelectorAll('.mobile-nav-link, .mobile-nav-card');
@@ -263,6 +421,77 @@ export class Navbar {
     private handleLogout() {
         authService.logout();
         window.location.href = '/';
+    }
+
+    private initializeGoogleTranslate() {
+        const win = window as typeof window & {
+            googleTranslateElementInit?: () => void;
+            google?: any;
+            googleTranslateInitialized?: boolean;
+        };
+
+        win.googleTranslateElementInit = () => {
+            if (win.googleTranslateInitialized || !win.google?.translate) {
+                return;
+            }
+
+            const containerId = 'google_translate_element';
+            if (!document.getElementById(containerId)) {
+                const el = document.createElement('div');
+                el.id = containerId;
+                el.style.display = 'none';
+                document.body.appendChild(el);
+            }
+
+            new win.google.translate.TranslateElement(
+                {
+                    pageLanguage: 'en',
+                    includedLanguages: 'en,hi,bn,as,or,ur,ne,sd,ta,te,mr,gu,kn,ml,pa,ar,fr,de,es,pt,ru,ja,ko,zh-CN,zh-TW,it,nl,tr,pl,vi,id,th,fa,uk,el,sv,da,fi',
+                    autoDisplay: false,
+                },
+                containerId
+            );
+
+            win.googleTranslateInitialized = true;
+            const savedLanguage = localStorage.getItem(this.languageStorageKey) || 'en';
+            this.applyGoogleLanguage(savedLanguage);
+        };
+
+        if (!document.getElementById('google-translate-script')) {
+            const script = document.createElement('script');
+            script.id = 'google-translate-script';
+            script.src = '//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
+            script.async = true;
+            document.body.appendChild(script);
+        } else if (win.google?.translate) {
+            win.googleTranslateElementInit();
+        }
+    }
+
+    private handleLanguageChange(language: string) {
+        localStorage.setItem(this.languageStorageKey, language);
+
+        const languageSelect = document.getElementById('language-select') as HTMLSelectElement | null;
+        const mobileLanguageSelect = document.getElementById('mobile-language-select') as HTMLSelectElement | null;
+
+        if (languageSelect) {
+            languageSelect.value = language;
+        }
+        if (mobileLanguageSelect) {
+            mobileLanguageSelect.value = language;
+        }
+
+        this.applyGoogleLanguage(language);
+    }
+
+    private applyGoogleLanguage(language: string) {
+        const select = document.querySelector<HTMLSelectElement>('.goog-te-combo');
+        if (!select) {
+            return;
+        }
+
+        select.value = language;
+        select.dispatchEvent(new Event('change'));
     }
 
     private toggleMobileMenu() {
