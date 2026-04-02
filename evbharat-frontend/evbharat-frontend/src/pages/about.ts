@@ -64,6 +64,33 @@ export async function renderAboutPage() {
                 </div>
             </div>
         </section>
+        
+        <!-- Team Section -->
+        <section class="relative z-20 bg-pagani-black py-24 px-8 border-t border-pagani-gold/20">
+            <div class="max-w-7xl mx-auto">
+                <div class="text-center mb-16 fade-in-section">
+                    <div class="flex items-center justify-center gap-4 mb-6">
+                        <span class="w-12 h-[2px] bg-pagani-gold"></span>
+                        <span class="text-pagani-gold tracking-[0.3em] uppercase text-sm">Leadership</span>
+                        <span class="w-12 h-[2px] bg-pagani-gold"></span>
+                    </div>
+                    <h2 class="text-4xl md:text-5xl font-orbitron font-bold">MEET THE <span class="text-pagani-gold">TEAM</span></h2>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                    ${team.map((member, index) => `
+                        <div class="fade-in-section group" style="animation-delay: ${index * 100}ms">
+                            <div class="relative overflow-hidden mb-6 aspect-square bg-gradient-to-br from-pagani-gold/20 to-transparent border border-pagani-gold/30 group">
+                                <img src="${member.image}" alt="${member.name}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110">
+                                <div class="absolute inset-0 bg-gradient-to-t from-pagani-black via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                            </div>
+                            <h3 class="text-xl font-orbitron font-bold mb-1 group-hover:text-pagani-gold transition-colors">${member.name}</h3>
+                            <div class="text-pagani-gold text-sm mb-3 uppercase tracking-wider">${member.role}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        </section>
 
         <!-- Values Section -->
         <section class="relative z-20 bg-gradient-to-b from-gray-900 to-pagani-black py-24 px-8">

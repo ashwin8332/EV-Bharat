@@ -1,9 +1,13 @@
+/// <reference types="google.maps" />
+
 import { authService } from '../utils/auth';
 
 interface ChargingStation {
     id: string;
     name: string;
     address: string;
+    lat: number;
+    lng: number;
     distance: number;
     connectors: string[];
     available: number;
@@ -12,6 +16,69 @@ interface ChargingStation {
     price: string;
     rating: number;
     amenities: string[];
+    routeDeviationKm?: number;
+}
+
+type TrafficLevel = 'low' | 'medium' | 'high';
+type MapLineString = {
+    type: 'LineString';
+    coordinates: [number, number][];
+};
+
+interface MapboxStep {
+    maneuver?: {
+        instruction?: string;
+    };
+    distance: number;
+    duration: number;
+    name?: string;
+}
+
+interface MapboxRouteData {
+    distance: number;
+    duration: number;
+    geometry: MapLineString;
+    legs?: Array<{
+        steps?: MapboxStep[];
+    }>;
+}
+
+interface MapboxStationSearchFeature {
+    id?: string;
+    text?: string;
+    place_name?: string;
+    center?: [number, number];
+}
+
+interface MapboxStationSearchResponse {
+    features?: MapboxStationSearchFeature[];
+}
+
+interface OpenChargeMapAddressInfo {
+    ID?: number;
+    Title?: string;
+    AddressLine1?: string;
+    AddressLine2?: string;
+    Town?: string;
+    StateOrProvince?: string;
+    Postcode?: string;
+    Latitude?: number;
+    Longitude?: number;
+}
+
+interface OpenChargeMapConnection {
+    ConnectionType?: {
+        Title?: string;
+    };
+    PowerKW?: number;
+}
+
+interface OpenChargeMapPoi {
+    ID?: number;
+    AddressInfo?: OpenChargeMapAddressInfo;
+    Connections?: OpenChargeMapConnection[];
+    NumberOfPoints?: number;
+    UsageCost?: string;
 }
 
 interface RouteOption {
@@ -21,7 +88,7 @@ interface RouteOption {
     duration: string;
     energyConsumption: number;
     chargingStops: number;
-    traffic: 'low' | 'medium' | 'high';
+    traffic: TrafficLevel;
     recommended: boolean;
 }
 
@@ -39,6 +106,14 @@ const MAPBOX_TOKEN = envMapboxToken && envMapboxToken.length > 0
 let mapboxMap: any = null;
 let mapboxOriginMarker: any = null;
 let mapboxDestinationMarker: any = null;
+let mapboxStationMarkers: Array<{ stationId: string; marker: any }> = [];
+let selectedStationId: string | null = null;
+let activeMapboxRoute: MapboxRouteData | null = null;
+let activeRouteCandidates: MapboxRouteData[] = [];
+let chargingRefreshNonce = 0;
+
+const MAPBOX_DEFAULT_CENTER: [number, number] = [76.5, 27.5];
+const MAPBOX_DEFAULT_ZOOM = 7;
 
 export async function renderMapPage() {
     // Check if user is authenticated
@@ -116,6 +191,18 @@ export async function renderMapPage() {
                                     />
                                 </div>
 
+                                <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-400">
+                                    <button
+                                        id="swap-route-btn"
+                                        class="px-3 py-1.5 rounded-lg border border-pagani-gold/30 text-pagani-gold hover:bg-pagani-gold hover:text-black transition-all"
+                                        type="button"
+                                    >
+                                        <i class="fa-solid fa-arrows-up-down-left-right mr-1"></i>
+                                        Swap
+                                    </button>
+                                    <span>Tip: Use current location icon for quick origin</span>
+                                </div>
+
                                 <button 
                                     id="calculate-route-btn"
                                     class="w-full py-3 bg-gradient-to-r from-pagani-gold to-bright-gold text-black font-orbitron font-bold rounded-lg hover:shadow-lg hover:shadow-pagani-gold/50 transition-all uppercase tracking-wider text-sm"
@@ -175,6 +262,17 @@ export async function renderMapPage() {
                                         <p class="text-gray-400 text-sm font-orbitron">Loading Map...</p>
                                     </div>
                                 </div>
+                                <div class="absolute left-3 top-3 z-20 flex flex-wrap gap-2">
+                                    <button id="map-locate-btn" type="button" class="px-3 py-1.5 rounded-lg border border-cyan-400/40 bg-gray-900/80 text-cyan-300 text-xs font-orbitron hover:bg-cyan-400 hover:text-black transition-all">
+                                        <i class="fa-solid fa-location-crosshairs mr-1"></i>Locate Me
+                                    </button>
+                                    <button id="map-fit-route-btn" type="button" class="px-3 py-1.5 rounded-lg border border-emerald-400/40 bg-gray-900/80 text-emerald-300 text-xs font-orbitron hover:bg-emerald-400 hover:text-black transition-all">
+                                        <i class="fa-solid fa-expand mr-1"></i>Fit Route
+                                    </button>
+                                    <button id="map-reset-view-btn" type="button" class="px-3 py-1.5 rounded-lg border border-amber-400/40 bg-gray-900/80 text-amber-300 text-xs font-orbitron hover:bg-amber-400 hover:text-black transition-all">
+                                        <i class="fa-solid fa-rotate-left mr-1"></i>Reset
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
@@ -206,6 +304,15 @@ export async function renderMapPage() {
                                     <p class="text-xs text-gray-400 mt-1">Charging Stops</p>
                                 </div>
                             </div>
+                        </div>
+
+                        <!-- Turn-by-Turn Guidance -->
+                        <div id="route-steps-panel" class="bg-gradient-to-br from-gray-900 to-pagani-black border border-pagani-gold/20 rounded-xl p-6 fade-in-section hidden" style="animation-delay: 260ms">
+                            <h3 class="text-lg font-orbitron font-bold mb-4 flex items-center gap-2">
+                                <i class="fa-solid fa-list-check text-pagani-gold"></i>
+                                Turn-by-Turn Guidance
+                            </h3>
+                            <div id="route-steps" class="space-y-2 max-h-[280px] overflow-y-auto pr-1"></div>
                         </div>
 
                         <!-- Weather Information Panel -->
@@ -299,8 +406,20 @@ export async function renderMapPage() {
                                     <i class="fa-solid fa-charging-station text-pagani-gold"></i>
                                     Charging Stations
                                 </span>
-                                <span class="text-sm text-gray-400 font-normal">5 stations found</span>
+                                <span id="charging-count" class="text-sm text-gray-400 font-normal">0 stations found</span>
                             </h3>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                                <select id="connector-filter" class="w-full px-3 py-2 bg-gray-800/60 border border-pagani-gold/20 rounded-lg text-sm text-gray-200 focus:outline-none focus:border-pagani-gold">
+                                    <option value="all">All Connectors</option>
+                                    <option value="CCS2">CCS2</option>
+                                    <option value="CHAdeMO">CHAdeMO</option>
+                                    <option value="Type 2">Type 2</option>
+                                </select>
+                                <label class="flex items-center gap-2 px-3 py-2 bg-gray-800/40 border border-pagani-gold/20 rounded-lg text-sm text-gray-300">
+                                    <input id="available-only" type="checkbox" class="accent-green-400">
+                                    Show only available chargers
+                                </label>
+                            </div>
                             <div class="space-y-3" id="charging-stations">
                                 <!-- Stations will be populated by JS -->
                             </div>
@@ -358,6 +477,7 @@ async function loadMapboxMap() {
             mapboxMap = null;
             mapboxOriginMarker = null;
             mapboxDestinationMarker = null;
+            mapboxStationMarkers = [];
         }
 
         // Remove loading overlay before creating map so it doesn't block the view
@@ -373,8 +493,8 @@ async function loadMapboxMap() {
         mapboxMap = new window.mapboxgl.Map({
             container,
             style: 'mapbox://styles/mapbox/dark-v11',
-            center: [76.5, 27.5],
-            zoom: 7,
+            center: MAPBOX_DEFAULT_CENTER,
+            zoom: MAPBOX_DEFAULT_ZOOM,
             attributionControl: true,
         });
 
@@ -392,27 +512,8 @@ async function loadMapboxMap() {
             setTimeout(() => mapboxMap?.resize(), 300);
             setTimeout(() => mapboxMap?.resize(), 1200);
 
-            // Seed charging station markers on map
-            CHARGING_STATIONS.forEach((station) => {
-                const el = document.createElement('div');
-                el.style.width = '12px';
-                el.style.height = '12px';
-                el.style.borderRadius = '9999px';
-                el.style.background = '#22d3ee';
-                el.style.border = '2px solid #0a0a0a';
-
-                const popup = new window.mapboxgl.Popup({ offset: 14 }).setHTML(`
-                    <div style="color:#0f172a;font-family:sans-serif">
-                        <strong>${station.name}</strong><br>
-                        <span style="font-size:12px">${station.address}</span>
-                    </div>
-                `);
-
-                new window.mapboxgl.Marker(el)
-                    .setLngLat([station.lng, station.lat])
-                    .setPopup(popup)
-                    .addTo(mapboxMap);
-            });
+            seedMapboxStationMarkers();
+            void refreshNearbyChargingStations({ origin: MAPBOX_DEFAULT_CENTER, silent: true });
         });
 
         // Retry resize in case container layout wasn't ready
@@ -436,13 +537,7 @@ let destinationMarker: google.maps.Marker | null = null;
 let startAutocomplete: google.maps.places.Autocomplete | null = null;
 let endAutocomplete: google.maps.places.Autocomplete | null = null;
 
-const CHARGING_STATIONS = [
-    { lat: 27.9878, lng: 76.3867, name: 'Tata Power EV Station', address: 'NH-48, Neemrana' },
-    { lat: 27.8750, lng: 76.2795, name: 'EESL Charging Hub', address: 'Behror Service Area' },
-    { lat: 27.3990, lng: 75.9710, name: 'Fortum Charge Station', address: 'Shahpura, NH-48' },
-    { lat: 27.0505, lng: 75.8570, name: 'ChargeZone Ultra', address: 'Near Jaipur Toll' },
-    { lat: 26.9450, lng: 75.7625, name: 'Statiq Hypercharger', address: 'Jaipur Ring Road' },
-];
+let chargingStationsData: ChargingStation[] = [];
 
 // Light map style (minimal customization for cleaner look)
 const LIGHT_MAP_STYLES: google.maps.MapTypeStyle[] = [
@@ -625,7 +720,7 @@ function initGoogleMap() {
         });
 
         // ── Charging station markers ──
-        CHARGING_STATIONS.forEach((station, idx) => {
+        chargingStationsData.forEach((station, idx) => {
             const marker = new google.maps.Marker({
                 position: { lat: station.lat, lng: station.lng },
                 map: googleMap!,
@@ -714,46 +809,7 @@ function initializeMapPage() {
         `).join('');
     }
 
-    // Populate charging stations
-    const chargingStations = document.getElementById('charging-stations');
-    if (chargingStations) {
-        const stations: ChargingStation[] = [
-            { id: '1', name: 'Tata Power EV Station', address: 'NH-48, Neemrana', distance: 125, connectors: ['CCS2', 'CHAdeMO'], available: 3, total: 4, power: '50kW DC', price: '₹18/kWh', rating: 4.5, amenities: ['Restroom', 'Café', 'WiFi'] },
-            { id: '2', name: 'EESL Charging Hub', address: 'Behror Service Area', distance: 148, connectors: ['CCS2', 'Type 2'], available: 2, total: 6, power: '22kW AC', price: '₹12/kWh', rating: 4.2, amenities: ['Restroom', 'Food Court'] },
-            { id: '3', name: 'Fortum Charge Station', address: 'Shahpura, NH-48', distance: 185, connectors: ['CCS2'], available: 4, total: 4, power: '150kW DC', price: '₹22/kWh', rating: 4.8, amenities: ['Lounge', 'Restroom', 'Café', 'WiFi'] },
-            { id: '4', name: 'ChargeZone Ultra', address: 'Near Jaipur Toll', distance: 230, connectors: ['CCS2', 'CHAdeMO', 'Type 2'], available: 5, total: 8, power: '60kW DC', price: '₹16/kWh', rating: 4.3, amenities: ['Restroom', 'Parking'] },
-            { id: '5', name: 'Statiq Hypercharger', address: 'Jaipur Ring Road', distance: 262, connectors: ['CCS2'], available: 2, total: 3, power: '120kW DC', price: '₹20/kWh', rating: 4.6, amenities: ['Mall', 'Restroom', 'Food'] }
-        ];
-
-        chargingStations.innerHTML = stations.map((station, index) => `
-            <div class="p-4 bg-pagani-black/50 border border-pagani-gold/10 rounded-lg hover:border-pagani-gold/30 transition-all ${index === 0 ? 'ring-2 ring-yellow-500/30 border-yellow-500/50' : ''}">
-                <div class="flex items-start justify-between gap-4">
-                    <div class="flex-1">
-                        <div class="flex items-center gap-2 mb-1">
-                            ${index === 0 ? '<span class="px-2 py-0.5 bg-yellow-500 text-black text-xs font-bold rounded">RECOMMENDED</span>' : ''}
-                            <h4 class="font-orbitron font-bold">${station.name}</h4>
-                        </div>
-                        <p class="text-xs text-gray-400 mb-2">${station.address}</p>
-                        <div class="flex flex-wrap gap-2 mb-2">
-                            ${station.connectors.map(c => `<span class="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs rounded">${c}</span>`).join('')}
-                            <span class="px-2 py-0.5 bg-purple-500/20 text-purple-400 text-xs rounded">${station.power}</span>
-                        </div>
-                        <div class="flex items-center gap-3 text-xs text-gray-400">
-                            <span><i class="fa-solid fa-location-dot mr-1"></i>${station.distance} km</span>
-                            <span class="${station.available > 0 ? 'text-green-400' : 'text-red-400'}">
-                                <i class="fa-solid fa-plug mr-1"></i>${station.available}/${station.total} available
-                            </span>
-                            <span><i class="fa-solid fa-indian-rupee-sign mr-1"></i>${station.price}</span>
-                            <span class="text-yellow-400"><i class="fa-solid fa-star mr-1"></i>${station.rating}</span>
-                        </div>
-                    </div>
-                    <button class="px-4 py-2 bg-pagani-gold/20 border border-pagani-gold/50 rounded-lg text-pagani-gold text-xs font-orbitron hover:bg-pagani-gold hover:text-black transition-all whitespace-nowrap">
-                        Navigate
-                    </button>
-                </div>
-            </div>
-        `).join('');
-    }
+    renderChargingStations(chargingStationsData);
 
     // Calculate route button – enhanced with geocoding
     const calculateBtn = document.getElementById('calculate-route-btn');
@@ -783,6 +839,39 @@ function initializeMapPage() {
     // Add current location button
     addCurrentLocationButton();
 
+    // Swap origin/destination quickly
+    const swapBtn = document.getElementById('swap-route-btn');
+    swapBtn?.addEventListener('click', () => {
+        const startInput = document.getElementById('start-location') as HTMLInputElement | null;
+        const endInput = document.getElementById('end-location') as HTMLInputElement | null;
+        if (!startInput || !endInput) return;
+        const oldStart = startInput.value;
+        startInput.value = endInput.value;
+        endInput.value = oldStart;
+        showNotification('Origin and destination swapped', 'success');
+    });
+
+    // Top-left map controls
+    const locateBtn = document.getElementById('map-locate-btn');
+    locateBtn?.addEventListener('click', () => {
+        locateAndCenterMap();
+    });
+
+    const fitRouteBtn = document.getElementById('map-fit-route-btn');
+    fitRouteBtn?.addEventListener('click', () => {
+        fitActiveRoute();
+    });
+
+    const resetViewBtn = document.getElementById('map-reset-view-btn');
+    resetViewBtn?.addEventListener('click', () => {
+        resetMapView();
+    });
+
+    const connectorFilter = document.getElementById('connector-filter') as HTMLSelectElement | null;
+    const availableOnly = document.getElementById('available-only') as HTMLInputElement | null;
+    connectorFilter?.addEventListener('change', () => renderChargingStations(getFilteredStations()));
+    availableOnly?.addEventListener('change', () => renderChargingStations(getFilteredStations()));
+
     // Route option selection
     const routeOptionElements = document.querySelectorAll('.route-option');
     routeOptionElements.forEach(option => {
@@ -807,6 +896,543 @@ function showNotification(message: string, type: 'success' | 'error') {
     notification.innerHTML = `<i class="fa-solid ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'} mr-2"></i>${message}`;
     document.body.appendChild(notification);
     setTimeout(() => notification.remove(), 3000);
+}
+
+function inferConnectorsFromText(raw: string): string[] {
+    const text = raw.toLowerCase();
+    const connectors: string[] = [];
+
+    if (text.includes('ccs')) connectors.push('CCS2');
+    if (text.includes('chademo')) connectors.push('CHAdeMO');
+    if (/\btype\s*2\b/.test(text)) connectors.push('Type 2');
+
+    // Keep filters practical even when provider metadata is sparse.
+    if (connectors.length === 0) connectors.push('CCS2');
+    return connectors;
+}
+
+function isLikelyInIndia(lng: number, lat: number): boolean {
+    return lat >= 6 && lat <= 38 && lng >= 68 && lng <= 98;
+}
+
+function formatOpenChargeAddress(info: OpenChargeMapAddressInfo): string {
+    const parts = [
+        info.AddressLine1,
+        info.AddressLine2,
+        info.Town,
+        info.StateOrProvince,
+        info.Postcode,
+    ].filter((part): part is string => Boolean(part && part.trim()));
+
+    return parts.join(', ') || info.Title || 'Address unavailable';
+}
+
+async function fetchMapboxChargingCandidates(
+    anchor: [number, number],
+    searchText: string,
+    limit = 8,
+): Promise<MapboxStationSearchFeature[]> {
+    const [lng, lat] = anchor;
+    const params = new URLSearchParams({
+        access_token: MAPBOX_TOKEN,
+        types: 'poi,address',
+        proximity: `${lng},${lat}`,
+        limit: String(limit),
+        autocomplete: 'true',
+    });
+
+    if (isLikelyInIndia(lng, lat)) {
+        params.set('country', 'IN');
+    }
+
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchText)}.json?${params.toString()}`;
+
+    try {
+        const res = await fetch(url);
+        if (!res.ok) return [];
+        const data = (await res.json()) as MapboxStationSearchResponse;
+        return Array.isArray(data.features) ? data.features : [];
+    } catch {
+        return [];
+    }
+}
+
+async function fetchOpenChargeMapCandidates(
+    anchor: [number, number],
+    limit = 10,
+): Promise<ChargingStation[]> {
+    const [lng, lat] = anchor;
+    const params = new URLSearchParams({
+        output: 'json',
+        latitude: String(lat),
+        longitude: String(lng),
+        distance: '80',
+        distanceunit: 'KM',
+        maxresults: String(limit),
+        compact: 'true',
+        verbose: 'false',
+    });
+
+    const url = `https://api.openchargemap.io/v3/poi/?${params.toString()}`;
+
+    try {
+        const res = await fetch(url);
+        if (!res.ok) return [];
+
+        const rows = (await res.json()) as OpenChargeMapPoi[];
+        if (!Array.isArray(rows)) return [];
+
+        return rows
+            .map((row, idx) => {
+                const info = row.AddressInfo;
+                const rawLat = info?.Latitude;
+                const rawLng = info?.Longitude;
+
+                if (typeof rawLat !== 'number' || typeof rawLng !== 'number') {
+                    return null;
+                }
+
+                const connectors = (row.Connections ?? [])
+                    .map((connection) => connection.ConnectionType?.Title?.trim())
+                    .filter((value): value is string => Boolean(value && value.length > 0));
+                const maxPower = Math.max(
+                    ...(row.Connections ?? [])
+                        .map((connection) => Number(connection.PowerKW))
+                        .filter((value) => Number.isFinite(value)),
+                );
+                const totalPoints = Math.max(
+                    1,
+                    Number(row.NumberOfPoints)
+                    || (row.Connections?.length ?? 0)
+                    || 1,
+                );
+
+                const title = (info?.Title || `Charging Station ${idx + 1}`).trim();
+                const station: ChargingStation = {
+                    id: row.ID ? `ocm-${row.ID}` : `ocm-fallback-${lat.toFixed(4)}-${lng.toFixed(4)}-${idx}`,
+                    name: title,
+                    address: info ? formatOpenChargeAddress(info) : 'Address unavailable',
+                    lat: rawLat,
+                    lng: rawLng,
+                    distance: Math.max(1, Math.round(haversineDistanceKm(lat, lng, rawLat, rawLng))),
+                    connectors: connectors.length > 0 ? connectors : ['CCS2'],
+                    available: totalPoints,
+                    total: totalPoints,
+                    power: Number.isFinite(maxPower) ? `${Math.round(maxPower)} kW` : 'Unknown',
+                    price: row.UsageCost?.trim() || '--',
+                    rating: 4.0,
+                    amenities: ['Public Access'],
+                };
+
+                return station;
+            })
+            .filter((station): station is ChargingStation => station !== null);
+    } catch {
+        return [];
+    }
+}
+
+function buildSearchAnchors(options: {
+    origin?: [number, number];
+    destination?: [number, number];
+    routeGeometry?: MapLineString | null;
+}): [number, number][] {
+    const anchors: [number, number][] = [];
+
+    if (options.origin) anchors.push(options.origin);
+    if (options.destination) anchors.push(options.destination);
+
+    const coords = options.routeGeometry?.coordinates;
+    if (coords && coords.length > 0) {
+        anchors.push(coords[Math.floor(coords.length / 2)] as [number, number]);
+    }
+
+    if (anchors.length === 0) {
+        anchors.push(MAPBOX_DEFAULT_CENTER);
+    }
+
+    return anchors;
+}
+
+async function refreshNearbyChargingStations(options: {
+    origin?: [number, number];
+    destination?: [number, number];
+    routeGeometry?: MapLineString | null;
+    silent?: boolean;
+} = {}) {
+    const nonce = ++chargingRefreshNonce;
+    const chargingCount = document.getElementById('charging-count');
+    if (chargingCount) chargingCount.textContent = 'Finding nearby stations...';
+
+    const anchors = buildSearchAnchors(options);
+    const canUseMapbox = Boolean(MAPBOX_TOKEN && MAPBOX_TOKEN.startsWith('pk.'));
+    const queries = [
+        'ev charging station',
+        'electric vehicle charging station',
+        'charging station',
+        'fast charger',
+    ];
+
+    const candidateGroups = canUseMapbox
+        ? await Promise.all(
+            anchors.flatMap((anchor, idx) =>
+                queries.map((query) => fetchMapboxChargingCandidates(anchor, query, Math.max(6, 12 - idx * 2))),
+            ),
+        )
+        : [];
+
+    if (nonce !== chargingRefreshNonce) return;
+
+    const reference = options.origin ?? anchors[0];
+    const stationMap = new Map<string, ChargingStation>();
+    let counter = 0;
+
+    candidateGroups.flat().forEach((feature) => {
+        if (!feature.center || feature.center.length < 2) return;
+
+        const lng = Number(feature.center[0]);
+        const lat = Number(feature.center[1]);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+        const name = (feature.text || feature.place_name || 'Charging Station').trim();
+        const address = (feature.place_name || name).trim();
+        const dedupeKey = `${name.toLowerCase()}|${lat.toFixed(4)}|${lng.toFixed(4)}`;
+        const distance = Math.max(1, Math.round(haversineDistanceKm(reference[1], reference[0], lat, lng)));
+
+        const station: ChargingStation = {
+            id: feature.id || `dynamic-${counter++}`,
+            name,
+            address,
+            lat,
+            lng,
+            distance,
+            connectors: inferConnectorsFromText(`${name} ${address}`),
+            available: 1,
+            total: 1,
+            power: 'Unknown',
+            price: '--',
+            rating: 4.0,
+            amenities: ['Public Access'],
+        };
+
+        const existing = stationMap.get(dedupeKey);
+        if (!existing || station.distance < existing.distance) {
+            stationMap.set(dedupeKey, station);
+        }
+    });
+
+    if (stationMap.size < 6) {
+        const fallbackGroups = await Promise.all(
+            anchors.slice(0, 3).map((anchor, idx) => fetchOpenChargeMapCandidates(anchor, Math.max(8, 14 - idx * 2))),
+        );
+
+        if (nonce !== chargingRefreshNonce) return;
+
+        fallbackGroups.flat().forEach((station) => {
+            const dedupeKey = `${station.name.toLowerCase()}|${station.lat.toFixed(4)}|${station.lng.toFixed(4)}`;
+            const stationWithDistance = {
+                ...station,
+                distance: Math.max(1, Math.round(haversineDistanceKm(reference[1], reference[0], station.lat, station.lng))),
+            };
+            const existing = stationMap.get(dedupeKey);
+
+            if (!existing || stationWithDistance.distance < existing.distance) {
+                stationMap.set(dedupeKey, stationWithDistance);
+            }
+        });
+    }
+
+    chargingStationsData = Array.from(stationMap.values())
+        .sort((a, b) => a.distance - b.distance)
+        .slice(0, 15);
+
+    if (selectedStationId && !chargingStationsData.some((station) => station.id === selectedStationId)) {
+        selectedStationId = null;
+    }
+
+    seedMapboxStationMarkers();
+    renderChargingStations(getFilteredStations());
+
+    if (!options.silent && chargingStationsData.length === 0) {
+        showNotification('No nearby charging stations found for this route area', 'error');
+    }
+}
+
+function seedMapboxStationMarkers() {
+    if (!mapboxMap || !window.mapboxgl) return;
+
+    mapboxStationMarkers.forEach(({ marker }) => marker.remove());
+    mapboxStationMarkers = [];
+
+    chargingStationsData.forEach((station) => {
+        const el = document.createElement('div');
+        el.style.width = '12px';
+        el.style.height = '12px';
+        el.style.borderRadius = '9999px';
+        el.style.background = '#22d3ee';
+        el.style.border = '2px solid #0a0a0a';
+        el.style.boxShadow = '0 0 0 2px rgba(34,211,238,0.2)';
+
+        const popup = new window.mapboxgl.Popup({ offset: 14 }).setHTML(`
+            <div style="color:#0f172a;font-family:sans-serif;min-width:200px">
+                <strong>${station.name}</strong><br>
+                <span style="font-size:12px">${station.address}</span><br>
+                <span style="font-size:11px;color:#334155">${station.available}/${station.total} available | ${station.power}</span>
+            </div>
+        `);
+
+        const marker = new window.mapboxgl.Marker(el)
+            .setLngLat([station.lng, station.lat])
+            .setPopup(popup)
+            .addTo(mapboxMap);
+
+        marker.getElement().addEventListener('click', () => {
+            selectedStationId = station.id;
+            renderChargingStations(getFilteredStations());
+        });
+
+        mapboxStationMarkers.push({ stationId: station.id, marker });
+    });
+}
+
+function haversineDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    const toRad = (deg: number) => deg * (Math.PI / 180);
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+    return 6371 * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+
+function getRouteDeviationKm(station: ChargingStation, geometry: MapLineString): number {
+    const points = geometry.coordinates;
+    const step = Math.max(1, Math.floor(points.length / 120));
+    let best = Number.POSITIVE_INFINITY;
+
+    for (let idx = 0; idx < points.length; idx += step) {
+        const [lng, lat] = points[idx];
+        const km = haversineDistanceKm(station.lat, station.lng, lat, lng);
+        if (km < best) best = km;
+    }
+
+    return Number.isFinite(best) ? best : station.distance;
+}
+
+function getStationsForActiveRoute(): ChargingStation[] {
+    if (!activeMapboxRoute) return chargingStationsData;
+
+    return chargingStationsData
+        .map((station) => ({
+            ...station,
+            routeDeviationKm: getRouteDeviationKm(station, activeMapboxRoute!.geometry),
+        }))
+        .sort((a, b) => (a.routeDeviationKm ?? Number.MAX_SAFE_INTEGER) - (b.routeDeviationKm ?? Number.MAX_SAFE_INTEGER));
+}
+
+function getFilteredStations(): ChargingStation[] {
+    const connectorFilter = document.getElementById('connector-filter') as HTMLSelectElement | null;
+    const availableOnly = document.getElementById('available-only') as HTMLInputElement | null;
+    const connector = connectorFilter?.value ?? 'all';
+    const onlyAvailable = Boolean(availableOnly?.checked);
+
+    return getStationsForActiveRoute().filter((station) => {
+        const connectorMatch = connector === 'all' || station.connectors.includes(connector);
+        const availabilityMatch = !onlyAvailable || station.available > 0;
+        return connectorMatch && availabilityMatch;
+    });
+}
+
+function renderChargingStations(stations: ChargingStation[]) {
+    const chargingStations = document.getElementById('charging-stations');
+    const chargingCount = document.getElementById('charging-count');
+    if (!chargingStations) return;
+
+    if (chargingCount) {
+        chargingCount.textContent = `${stations.length} station${stations.length === 1 ? '' : 's'} found`;
+    }
+
+    if (stations.length === 0) {
+        const zeroStateMessage = chargingStationsData.length === 0
+            ? 'No nearby charging stations found yet. Set source and destination or use Locate Me to search again.'
+            : 'No stations match your filters. Try changing connector type or availability filter.';
+        chargingStations.innerHTML = `
+            <div class="p-4 rounded-lg border border-red-500/30 bg-red-500/10 text-sm text-red-300">
+                ${zeroStateMessage}
+            </div>
+        `;
+        return;
+    }
+
+    chargingStations.innerHTML = stations.map((station, index) => {
+        const isHighlighted = selectedStationId === station.id;
+        const hasRouteDeviation = typeof station.routeDeviationKm === 'number';
+        const distanceLabel = hasRouteDeviation
+            ? `~${station.routeDeviationKm!.toFixed(1)} km from route`
+            : `${station.distance} km away`;
+
+        return `
+            <div class="p-4 bg-pagani-black/50 border ${isHighlighted ? 'border-cyan-300 ring-2 ring-cyan-400/25' : 'border-pagani-gold/10'} rounded-lg hover:border-pagani-gold/30 transition-all ${index === 0 ? 'ring-2 ring-yellow-500/25' : ''}" data-station-card="${station.id}">
+                <div class="flex items-start justify-between gap-4">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 mb-1">
+                            ${index === 0 ? '<span class="px-2 py-0.5 bg-yellow-500 text-black text-xs font-bold rounded">BEST STOP</span>' : ''}
+                            <h4 class="font-orbitron font-bold">${station.name}</h4>
+                        </div>
+                        <p class="text-xs text-gray-400 mb-2">${station.address}</p>
+                        <div class="flex flex-wrap gap-2 mb-2">
+                            ${station.connectors.map(c => `<span class="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs rounded">${c}</span>`).join('')}
+                            <span class="px-2 py-0.5 bg-purple-500/20 text-purple-400 text-xs rounded">${station.power}</span>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-3 text-xs text-gray-400">
+                            <span><i class="fa-solid fa-location-dot mr-1"></i>${distanceLabel}</span>
+                            <span class="${station.available > 0 ? 'text-green-400' : 'text-red-400'}">
+                                <i class="fa-solid fa-plug mr-1"></i>${station.available}/${station.total} available
+                            </span>
+                            <span><i class="fa-solid fa-indian-rupee-sign mr-1"></i>${station.price}</span>
+                            <span class="text-yellow-400"><i class="fa-solid fa-star mr-1"></i>${station.rating}</span>
+                        </div>
+                    </div>
+                    <div class="flex flex-col gap-2">
+                        <button class="focus-station-btn px-3 py-1.5 bg-cyan-500/20 border border-cyan-400/50 rounded-lg text-cyan-300 text-xs font-orbitron hover:bg-cyan-400 hover:text-black transition-all whitespace-nowrap" data-station-id="${station.id}">
+                            Focus
+                        </button>
+                        <button class="set-stop-btn px-3 py-1.5 bg-pagani-gold/20 border border-pagani-gold/50 rounded-lg text-pagani-gold text-xs font-orbitron hover:bg-pagani-gold hover:text-black transition-all whitespace-nowrap" data-station-id="${station.id}">
+                            Set Stop
+                        </button>
+                        <button class="navigate-station-btn px-3 py-1.5 bg-emerald-500/15 border border-emerald-400/40 rounded-lg text-emerald-300 text-xs font-orbitron hover:bg-emerald-400 hover:text-black transition-all whitespace-nowrap" data-station-id="${station.id}">
+                            Open Maps
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    wireChargingStationActions();
+}
+
+function wireChargingStationActions() {
+    const findStation = (id: string) => chargingStationsData.find((station) => station.id === id);
+
+    document.querySelectorAll<HTMLButtonElement>('.focus-station-btn').forEach((btn) => {
+        btn.onclick = () => {
+            const station = findStation(btn.dataset.stationId ?? '');
+            if (!station) return;
+            selectedStationId = station.id;
+            if (mapboxMap) {
+                mapboxMap.flyTo({ center: [station.lng, station.lat], zoom: 12, duration: 900 });
+            }
+            const markerRef = mapboxStationMarkers.find((m) => m.stationId === station.id);
+            markerRef?.marker.togglePopup();
+            renderChargingStations(getFilteredStations());
+            showNotification(`Focused on ${station.name}`, 'success');
+        };
+    });
+
+    document.querySelectorAll<HTMLButtonElement>('.set-stop-btn').forEach((btn) => {
+        btn.onclick = () => {
+            const station = findStation(btn.dataset.stationId ?? '');
+            if (!station) return;
+            const endInput = document.getElementById('end-location') as HTMLInputElement | null;
+            const startInput = document.getElementById('start-location') as HTMLInputElement | null;
+            if (!endInput) return;
+
+            selectedStationId = station.id;
+            endInput.value = `${station.name}, ${station.address}`;
+            addOrMoveMapboxMarker('destination', [station.lng, station.lat], '#ef4444');
+
+            if (mapboxMap) {
+                mapboxMap.flyTo({ center: [station.lng, station.lat], zoom: 12, duration: 900 });
+            }
+
+            showNotification(`${station.name} selected as destination`, 'success');
+            renderChargingStations(getFilteredStations());
+
+            if (startInput?.value.trim()) {
+                calculateDynamicRoute();
+            }
+        };
+    });
+
+    document.querySelectorAll<HTMLButtonElement>('.navigate-station-btn').forEach((btn) => {
+        btn.onclick = () => {
+            const station = findStation(btn.dataset.stationId ?? '');
+            if (!station) return;
+            const url = `https://www.google.com/maps/dir/?api=1&destination=${station.lat},${station.lng}`;
+            window.open(url, '_blank', 'noopener,noreferrer');
+        };
+    });
+}
+
+function fitBoundsForGeometry(geometry: MapLineString) {
+    if (!mapboxMap || !window.mapboxgl || geometry.coordinates.length === 0) return;
+
+    const bounds = geometry.coordinates.reduce(
+        (bbox: any, coord: number[]) => bbox.extend(coord),
+        new window.mapboxgl.LngLatBounds(geometry.coordinates[0], geometry.coordinates[0]),
+    );
+    mapboxMap.fitBounds(bounds, { padding: 50, duration: 900 });
+}
+
+function locateAndCenterMap() {
+    if (!('geolocation' in navigator)) {
+        showNotification('Geolocation is not supported by your browser', 'error');
+        return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+        (position) => {
+            const center: [number, number] = [position.coords.longitude, position.coords.latitude];
+            addOrMoveMapboxMarker('origin', center, '#22c55e');
+            if (mapboxMap) {
+                mapboxMap.flyTo({ center, zoom: 12, duration: 900 });
+            }
+
+            const startInput = document.getElementById('start-location') as HTMLInputElement | null;
+            if (startInput && !startInput.value.trim()) {
+                startInput.value = `${center[1].toFixed(5)}, ${center[0].toFixed(5)}`;
+            }
+
+            void refreshNearbyChargingStations({ origin: center, silent: true });
+
+            showNotification('Map centered to your current location', 'success');
+        },
+        () => showNotification('Unable to access your location', 'error'),
+    );
+}
+
+function fitActiveRoute() {
+    if (!activeMapboxRoute) {
+        showNotification('No active route to fit yet', 'error');
+        return;
+    }
+    fitBoundsForGeometry(activeMapboxRoute.geometry);
+}
+
+function clearMapboxRouteLayer() {
+    if (!mapboxMap) return;
+
+    const sourceId = 'route-line';
+    if (mapboxMap.getLayer(sourceId)) mapboxMap.removeLayer(sourceId);
+    if (mapboxMap.getSource(sourceId)) mapboxMap.removeSource(sourceId);
+}
+
+function resetMapView() {
+    activeMapboxRoute = null;
+    activeRouteCandidates = [];
+    clearMapboxRouteLayer();
+
+    if (mapboxMap) {
+        mapboxMap.flyTo({ center: MAPBOX_DEFAULT_CENTER, zoom: MAPBOX_DEFAULT_ZOOM, duration: 900 });
+    }
+
+    const stepsPanel = document.getElementById('route-steps-panel');
+    const stepsList = document.getElementById('route-steps');
+    if (stepsPanel) stepsPanel.classList.add('hidden');
+    if (stepsList) stepsList.innerHTML = '';
+
+    resetTripAnalysis();
+    renderChargingStations(getFilteredStations());
+    showNotification('Map reset to default view', 'success');
 }
 
 // ── Dynamic Location & Route Functions ────────────────────────────────
@@ -963,8 +1589,8 @@ function calculateDynamicRoute() {
                 return;
             }
 
-            const route = await getRouteMapbox(originGeo.center, destGeo.center);
-            if (!route) {
+            const routes = await getRouteMapboxRoutes(originGeo.center, destGeo.center);
+            if (routes.length === 0) {
                 calculateBtn.innerHTML = '<i class="fa-solid fa-exclamation-triangle mr-2"></i> Route Failed';
                 showNotification('No route found between these locations', 'error');
                 resetTripAnalysis();
@@ -974,28 +1600,19 @@ function calculateDynamicRoute() {
                 return;
             }
 
+            activeRouteCandidates = routes;
+            const selectedIndex = pickRecommendedRouteIndex(routes);
+
             addOrMoveMapboxMarker('origin', originGeo.center, '#22c55e');
             addOrMoveMapboxMarker('destination', destGeo.center, '#ef4444');
-            drawMapboxRoute(route.geometry);
-
-            const distance = Math.round(route.distance / 1000);
-            const durationText = formatMinutes(Math.round(route.duration / 60));
-            const kmEl = document.querySelector('[data-trip="km"]');
-            const durEl = document.querySelector('[data-trip="dur"]');
-            const energyEl = document.querySelector('[data-trip="energy"]');
-            const stopsEl = document.querySelector('[data-trip="stops"]');
-
-            if (kmEl) kmEl.textContent = String(distance);
-            if (durEl) durEl.textContent = durationText;
-
-            const estimatedEnergy = Math.round(distance * 0.2);
-            if (energyEl) energyEl.textContent = `${estimatedEnergy} kWh`;
-
-            const currentRange = 392;
-            const estimatedStops = distance > currentRange ? Math.ceil((distance - currentRange) / 300) : 0;
-            if (stopsEl) stopsEl.textContent = String(estimatedStops);
-
-            updateRouteOptions(distance, durationText);
+            applyRouteSelection(selectedIndex);
+            updateRouteOptions(routes, selectedIndex);
+            await refreshNearbyChargingStations({
+                origin: originGeo.center,
+                destination: destGeo.center,
+                routeGeometry: activeMapboxRoute?.geometry ?? null,
+                silent: true,
+            });
 
             calculateBtn.innerHTML = '<i class="fa-solid fa-check mr-2"></i> Route Calculated!';
             showNotification(`Route from ${originGeo.name} to ${destGeo.name} calculated`, 'success');
@@ -1006,9 +1623,15 @@ function calculateDynamicRoute() {
                 destGeo.center[1],
                 destGeo.center[0],
                 originGeo.name,
-                destGeo.name
+                destGeo.name,
             );
 
+            setTimeout(() => {
+                calculateBtn.innerHTML = '<i class="fa-solid fa-magnifying-glass-location mr-2"></i> Calculate Route';
+            }, 3000);
+        }).catch(() => {
+            calculateBtn.innerHTML = '<i class="fa-solid fa-exclamation-triangle mr-2"></i> Route Failed';
+            showNotification('Route calculation failed. Please retry.', 'error');
             setTimeout(() => {
                 calculateBtn.innerHTML = '<i class="fa-solid fa-magnifying-glass-location mr-2"></i> Calculate Route';
             }, 3000);
@@ -1066,16 +1689,18 @@ function parseCoordinateInput(value: string): { lat: number; lng: number } | nul
     return { lat, lng };
 }
 
-async function getRouteMapbox(origin: [number, number], destination: [number, number]) {
+async function getRouteMapboxRoutes(origin: [number, number], destination: [number, number]): Promise<MapboxRouteData[]> {
     try {
         const coords = `${origin[0]},${origin[1]};${destination[0]},${destination[1]}`;
-        const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${coords}?geometries=geojson&overview=full&steps=false&access_token=${MAPBOX_TOKEN}`;
+        const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${coords}?alternatives=true&geometries=geojson&overview=full&steps=true&access_token=${MAPBOX_TOKEN}`;
         const res = await fetch(url);
-        if (!res.ok) return null;
+        if (!res.ok) return [];
         const data = await res.json();
-        return data?.routes?.[0] || null;
+        const routes = data?.routes;
+        if (!Array.isArray(routes)) return [];
+        return routes as MapboxRouteData[];
     } catch {
-        return null;
+        return [];
     }
 }
 
@@ -1096,7 +1721,7 @@ function addOrMoveMapboxMarker(kind: 'origin' | 'destination', center: [number, 
     else mapboxDestinationMarker = marker;
 }
 
-function drawMapboxRoute(geometry: GeoJSON.LineString) {
+function drawMapboxRoute(geometry: MapLineString) {
     if (!mapboxMap || !window.mapboxgl) return;
 
     const sourceId = 'route-line';
@@ -1123,8 +1748,137 @@ function drawMapboxRoute(geometry: GeoJSON.LineString) {
         },
     });
 
-    const bounds = geometry.coordinates.reduce((b: any, coord: number[]) => b.extend(coord), new window.mapboxgl.LngLatBounds(geometry.coordinates[0], geometry.coordinates[0]));
-    mapboxMap.fitBounds(bounds, { padding: 50, duration: 900 });
+    fitBoundsForGeometry(geometry);
+}
+
+function escapeHtml(text: string): string {
+    return text
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+}
+
+function getTrafficLevel(route: MapboxRouteData): TrafficLevel {
+    const distanceKm = route.distance / 1000;
+    const hours = route.duration / 3600;
+    const avgSpeed = hours > 0 ? distanceKm / hours : 0;
+
+    if (avgSpeed < 38) return 'high';
+    if (avgSpeed < 55) return 'medium';
+    return 'low';
+}
+
+function estimateEnergyKwh(distanceKm: number, traffic: TrafficLevel): number {
+    const factor = traffic === 'high' ? 0.22 : traffic === 'medium' ? 0.2 : 0.18;
+    return Math.round(distanceKm * factor);
+}
+
+function estimateChargingStops(distanceKm: number): number {
+    const currentRangeKm = 392;
+    return distanceKm > currentRangeKm ? Math.ceil((distanceKm - currentRangeKm) / 300) : 0;
+}
+
+function updateTripSummary(distanceKm: number, durationText: string, energyKwh: number, chargingStops: number) {
+    const kmEl = document.querySelector('[data-trip="km"]');
+    const durEl = document.querySelector('[data-trip="dur"]');
+    const energyEl = document.querySelector('[data-trip="energy"]');
+    const stopsEl = document.querySelector('[data-trip="stops"]');
+
+    if (kmEl) kmEl.textContent = String(distanceKm);
+    if (durEl) durEl.textContent = durationText;
+    if (energyEl) energyEl.textContent = `${energyKwh} kWh`;
+    if (stopsEl) stopsEl.textContent = String(chargingStops);
+}
+
+function renderRouteSteps(route: MapboxRouteData) {
+    const panel = document.getElementById('route-steps-panel');
+    const stepsContainer = document.getElementById('route-steps');
+    if (!panel || !stepsContainer) return;
+
+    const steps = route.legs?.[0]?.steps ?? [];
+    if (steps.length === 0) {
+        panel.classList.add('hidden');
+        stepsContainer.innerHTML = '';
+        return;
+    }
+
+    panel.classList.remove('hidden');
+    stepsContainer.innerHTML = steps.slice(0, 14).map((step, idx) => {
+        const distanceMeters = Math.max(1, Math.round(step.distance));
+        const stepDistance = distanceMeters >= 1000
+            ? `${(distanceMeters / 1000).toFixed(1)} km`
+            : `${distanceMeters} m`;
+        const instruction = escapeHtml(step.maneuver?.instruction || step.name || 'Continue straight');
+
+        return `
+            <div class="p-3 rounded-lg border border-pagani-gold/15 bg-pagani-black/40">
+                <div class="flex items-start gap-3">
+                    <span class="w-6 h-6 shrink-0 rounded-full bg-pagani-gold/25 text-pagani-gold text-xs font-bold flex items-center justify-center">${idx + 1}</span>
+                    <div>
+                        <p class="text-sm text-gray-100">${instruction}</p>
+                        <p class="text-xs text-gray-400 mt-1">${stepDistance} • ${formatMinutes(Math.max(1, Math.round(step.duration / 60)))}</p>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function highlightRouteOption(routeIndex: number) {
+    const routeOptions = document.getElementById('route-options');
+    if (!routeOptions) return;
+
+    routeOptions.querySelectorAll<HTMLElement>('.route-option').forEach((node) => {
+        const selected = Number(node.dataset.routeIndex) === routeIndex;
+        node.classList.remove('border-pagani-gold', 'ring-2', 'ring-pagani-gold/30', 'border-pagani-gold/20');
+        if (selected) {
+            node.classList.add('border-pagani-gold', 'ring-2', 'ring-pagani-gold/30');
+        } else {
+            node.classList.add('border-pagani-gold/20');
+        }
+    });
+}
+
+function pickRecommendedRouteIndex(routes: MapboxRouteData[]): number {
+    if (routes.length === 0) return 0;
+
+    let bestIdx = 0;
+    let bestScore = Number.POSITIVE_INFINITY;
+
+    routes.forEach((route, idx) => {
+        const distanceKm = route.distance / 1000;
+        const durationMins = route.duration / 60;
+        const traffic = getTrafficLevel(route);
+        const energy = estimateEnergyKwh(distanceKm, traffic);
+        const score = durationMins * 0.55 + energy * 0.45;
+        if (score < bestScore) {
+            bestScore = score;
+            bestIdx = idx;
+        }
+    });
+
+    return bestIdx;
+}
+
+function applyRouteSelection(routeIndex: number) {
+    const route = activeRouteCandidates[routeIndex];
+    if (!route) return;
+
+    activeMapboxRoute = route;
+    drawMapboxRoute(route.geometry);
+
+    const distanceKm = Math.round(route.distance / 1000);
+    const durationText = formatMinutes(Math.max(1, Math.round(route.duration / 60)));
+    const traffic = getTrafficLevel(route);
+    const energyKwh = estimateEnergyKwh(distanceKm, traffic);
+    const stops = estimateChargingStops(distanceKm);
+
+    updateTripSummary(distanceKm, durationText, energyKwh, stops);
+    renderRouteSteps(route);
+    renderChargingStations(getFilteredStations());
+    highlightRouteOption(routeIndex);
 }
 
 function geocodeLocation(geocoder: google.maps.Geocoder, address: string): Promise<google.maps.GeocoderResult | null> {
@@ -1175,6 +1929,9 @@ void __legacyGoogleMapFns;
 
 
 function resetTripAnalysis() {
+    activeMapboxRoute = null;
+    activeRouteCandidates = [];
+
     const kmEl = document.querySelector('[data-trip="km"]');
     const durEl = document.querySelector('[data-trip="dur"]');
     const energyEl = document.querySelector('[data-trip="energy"]');
@@ -1194,6 +1951,11 @@ function resetTripAnalysis() {
     const impactPanel = document.getElementById('weather-ev-impact');
     if (impactPanel) impactPanel.classList.add('hidden');
 
+    const stepsPanel = document.getElementById('route-steps-panel');
+    const stepsList = document.getElementById('route-steps');
+    if (stepsPanel) stepsPanel.classList.add('hidden');
+    if (stepsList) stepsList.innerHTML = '';
+
     // Reset battery status notification
     const batteryNotification = document.querySelector('.bg-green-500\\/10 p, .bg-yellow-500\\/10 p, .bg-blue-500\\/10 p');
     if (batteryNotification) {
@@ -1204,6 +1966,8 @@ function resetTripAnalysis() {
         batteryNotification.parentElement!.className = 'mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg';
         batteryNotification.className = 'text-xs text-blue-400';
     }
+
+    renderChargingStations(getFilteredStations());
 }
 
 function addCurrentLocationButton() {
@@ -1231,6 +1995,7 @@ function addCurrentLocationButton() {
                         (startInput as HTMLInputElement).value = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
                         addOrMoveMapboxMarker('origin', [lng, lat], '#22c55e');
                         if (mapboxMap) mapboxMap.flyTo({ center: [lng, lat], zoom: 12 });
+                        void refreshNearbyChargingStations({ origin: [lng, lat], silent: true });
                         showNotification('Current location detected', 'success');
                     }, (_error) => {
                         button.innerHTML = '<i class="fa-solid fa-location-crosshairs text-sm"></i>';
@@ -1545,37 +2310,30 @@ async function fetchRouteWeather(
 
 // ── Dynamic Route Options ────────────────────────────────────────────
 
-function updateRouteOptions(distanceKm: number, durationText: string) {
+function updateRouteOptions(routes: MapboxRouteData[], recommendedIndex: number) {
     const routeOptions = document.getElementById('route-options');
     if (!routeOptions) return;
 
-    // Parse duration text to minutes for calculation
-    const durationMins = parseDurationToMinutes(durationText);
+    const routeNames = ['Balanced Route', 'Fastest Route', 'Energy Saver', 'Alternative Route'];
 
-    // Generate three route variants from real data
-    const ecoDistance = distanceKm + Math.round(distanceKm * 0.05);     // 5% longer
-    const ecoDuration = Math.round(durationMins * 1.12);                // 12% more time
-    const ecoEnergy = Math.round(ecoDistance * 0.16);                   // more efficient kWh/km
+    const routeCards: RouteOption[] = routes.slice(0, 4).map((route, idx) => {
+        const distance = Math.round(route.distance / 1000);
+        const duration = formatMinutes(Math.max(1, Math.round(route.duration / 60)));
+        const traffic = getTrafficLevel(route);
+        return {
+            id: `${idx + 1}`,
+            name: routeNames[idx] || `Route ${idx + 1}`,
+            distance,
+            duration,
+            energyConsumption: estimateEnergyKwh(distance, traffic),
+            chargingStops: estimateChargingStops(distance),
+            traffic,
+            recommended: idx === recommendedIndex,
+        };
+    });
 
-    const fastDistance = distanceKm;
-    const fastDuration = durationMins;
-    const fastEnergy = Math.round(fastDistance * 0.19);
-
-    const scenicDistance = distanceKm + Math.round(distanceKm * 0.15);  // 15% longer
-    const scenicDuration = Math.round(durationMins * 1.32);
-    const scenicEnergy = Math.round(scenicDistance * 0.20);
-
-    const currentRange = 392;
-    const calcStops = (d: number) => d > currentRange ? Math.ceil((d - currentRange) / 300) : 0;
-
-    const routes = [
-        { name: 'Energy Efficient', distance: ecoDistance, duration: formatMinutes(ecoDuration), energy: ecoEnergy, stops: calcStops(ecoDistance), traffic: 'low' as 'low' | 'medium' | 'high', recommended: true },
-        { name: 'Fastest Route', distance: fastDistance, duration: formatMinutes(fastDuration), energy: fastEnergy, stops: calcStops(fastDistance), traffic: 'high' as 'low' | 'medium' | 'high', recommended: false },
-        { name: 'Scenic Route', distance: scenicDistance, duration: formatMinutes(scenicDuration), energy: scenicEnergy, stops: calcStops(scenicDistance), traffic: 'low' as 'low' | 'medium' | 'high', recommended: false },
-    ];
-
-    routeOptions.innerHTML = routes.map(route => `
-        <div class="route-option p-4 bg-pagani-black/50 border ${route.recommended ? 'border-pagani-gold' : 'border-pagani-gold/20'} rounded-lg cursor-pointer hover:border-pagani-gold transition-all ${route.recommended ? 'ring-2 ring-pagani-gold/30' : ''}">
+    routeOptions.innerHTML = routeCards.map((route, idx) => `
+        <div class="route-option p-4 bg-pagani-black/50 border ${route.recommended ? 'border-pagani-gold' : 'border-pagani-gold/20'} rounded-lg cursor-pointer hover:border-pagani-gold transition-all ${route.recommended ? 'ring-2 ring-pagani-gold/30' : ''}" data-route-index="${idx}">
             <div class="flex items-center justify-between mb-2">
                 <div class="flex items-center gap-2">
                     ${route.recommended ? '<span class="px-2 py-0.5 bg-pagani-gold text-black text-xs font-bold rounded">AI PICK</span>' : ''}
@@ -1585,8 +2343,8 @@ function updateRouteOptions(distanceKm: number, durationText: string) {
             </div>
             <div class="flex items-center gap-4 text-xs text-gray-400">
                 <span><i class="fa-solid fa-clock mr-1"></i>${route.duration}</span>
-                <span><i class="fa-solid fa-bolt mr-1"></i>${route.energy} kWh</span>
-                <span><i class="fa-solid fa-charging-station mr-1"></i>${route.stops} stops</span>
+                <span><i class="fa-solid fa-bolt mr-1"></i>${route.energyConsumption} kWh</span>
+                <span><i class="fa-solid fa-charging-station mr-1"></i>${route.chargingStops} stops</span>
                 <span class="${route.traffic === 'low' ? 'text-green-400' : route.traffic === 'medium' ? 'text-yellow-400' : 'text-red-400'}">
                     <i class="fa-solid fa-traffic-light mr-1"></i>${route.traffic}
                 </span>
@@ -1594,26 +2352,13 @@ function updateRouteOptions(distanceKm: number, durationText: string) {
         </div>
     `).join('');
 
-    // Re-attach click handlers
-    routeOptions.querySelectorAll('.route-option').forEach(opt => {
+    routeOptions.querySelectorAll<HTMLElement>('.route-option').forEach((opt) => {
         opt.addEventListener('click', () => {
-            routeOptions.querySelectorAll('.route-option').forEach(o => {
-                o.classList.remove('border-pagani-gold', 'ring-2', 'ring-pagani-gold/30');
-                o.classList.add('border-pagani-gold/20');
-            });
-            opt.classList.remove('border-pagani-gold/20');
-            opt.classList.add('border-pagani-gold', 'ring-2', 'ring-pagani-gold/30');
+            const idx = Number(opt.dataset.routeIndex ?? '-1');
+            if (!Number.isFinite(idx) || idx < 0) return;
+            applyRouteSelection(idx);
         });
     });
-}
-
-function parseDurationToMinutes(text: string): number {
-    let mins = 0;
-    const hMatch = text.match(/(\d+)\s*h/i);
-    const mMatch = text.match(/(\d+)\s*m/i);
-    if (hMatch) mins += parseInt(hMatch[1]) * 60;
-    if (mMatch) mins += parseInt(mMatch[1]);
-    return mins || 60;
 }
 
 function formatMinutes(totalMins: number): string {

@@ -15,6 +15,7 @@ type ChatMode = 'free' | 'document';
 
 interface HealthStatus { status: string; active_sessions: number; timestamp: number; }
 interface SessionStatus { exists: boolean; processed_at?: number; file_path?: string; document_count?: number; }
+interface SpeechToTextResult { text: string; language: string; processing_time: number; model: string; }
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  API Service
@@ -57,6 +58,30 @@ class EVAdvisorService {
         });
         if (!r.ok) { const e = await r.json().catch(() => ({ detail: 'Chat failed' })); throw new Error(e.detail || 'Chat failed'); }
         return r.json() as Promise<{ response: string; session_id: string; processing_time: number }>;
+    }
+
+    async speechToText(audioFile: File): Promise<SpeechToTextResult> {
+        const f = new FormData();
+        f.append('file', audioFile);
+        const r = await this.fetchR(`${this.baseUrl}/speech-to-text`, { method: 'POST', body: f }, 1);
+        if (!r.ok) {
+            const e = await r.json().catch(() => ({ detail: 'Speech transcription failed' }));
+            throw new Error(e.detail || 'Speech transcription failed');
+        }
+        return r.json();
+    }
+
+    async textToSpeech(text: string, language = 'en', slow = false): Promise<Blob> {
+        const r = await this.fetchR(`${this.baseUrl}/text-to-speech`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, language, slow }),
+        }, 1);
+        if (!r.ok) {
+            const e = await r.json().catch(() => ({ detail: 'Text to speech failed' }));
+            throw new Error(e.detail || 'Text to speech failed');
+        }
+        return r.blob();
     }
 
     async sessionStatus(sid: string): Promise<SessionStatus> {
@@ -169,6 +194,19 @@ export async function renderRAGChatPage() {
     let uploading = false;
     let uploadName: string | null = null;
     let online = false;
+    let isRecording = false;
+    let isTranscribing = false;
+    let ttsEnabled = false;
+    let recorder: MediaRecorder | null = null;
+    let recordingStream: MediaStream | null = null;
+    let audioChunks: BlobPart[] = [];
+    let audioPlayer: HTMLAudioElement | null = null;
+    let lastAssistantReply = '';
+    let ttsLanguage = 'en';
+    let ttsSlow = false;
+    let ttsVolume = 1;
+    let recordingStartedAt = 0;
+    let recordingTicker: number | null = null;
 
     // ── Health ────────────────────────────────────────────────────────────
     async function checkHealth(): Promise<boolean> {
@@ -296,6 +334,327 @@ export async function renderRAGChatPage() {
         if (el) requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
     }
 
+    function setVoiceStatus(msg: string, type: 'info' | 'success' | 'error' = 'info') {
+        const el = document.getElementById('ev-voice-status');
+        if (!el) return;
+        const color = type === 'error' ? '#f87171' : type === 'success' ? '#34d399' : '#9ca3af';
+        el.textContent = msg;
+        el.style.color = color;
+    }
+
+    function setVoiceHint(msg: string) {
+        const el = document.getElementById('ev-voice-hint');
+        if (el) el.textContent = msg;
+    }
+
+    function formatDuration(totalSeconds: number): string {
+        const mm = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+        const ss = String(totalSeconds % 60).padStart(2, '0');
+        return `${mm}:${ss}`;
+    }
+
+    function updateMicButton(active: boolean) {
+        const btn = document.getElementById('ev-mic') as HTMLButtonElement | null;
+        const icon = document.getElementById('ev-mic-icon');
+        const text = document.getElementById('ev-mic-text');
+        const dot = document.getElementById('ev-mic-dot');
+        if (!btn) return;
+
+        btn.classList.toggle('ev-mic-recording', active);
+        btn.style.background = active
+            ? 'linear-gradient(135deg, rgba(239,68,68,.95), rgba(249,115,22,.85))'
+            : 'linear-gradient(135deg, rgba(31,41,55,.9), rgba(17,24,39,.7))';
+        btn.style.borderColor = active ? 'rgba(248,113,113,.65)' : 'rgba(75,85,99,.35)';
+        btn.style.color = active ? '#ffffff' : '#e5e7eb';
+        btn.title = active ? 'Stop voice recording' : 'Start voice input';
+
+        if (icon) icon.className = active ? 'fa-solid fa-stop' : 'fa-solid fa-microphone-lines';
+        if (text) text.textContent = active ? 'Stop Voice' : 'Start Voice';
+        if (dot) {
+            dot.style.background = active ? '#ffffff' : '#34d399';
+            dot.style.opacity = active ? '1' : '.75';
+        }
+    }
+
+    function updateTtsButton(active: boolean) {
+        const btn = document.getElementById('ev-tts-toggle') as HTMLButtonElement | null;
+        const text = document.getElementById('ev-tts-toggle-text');
+        if (!btn) return;
+
+        btn.style.background = active
+            ? 'linear-gradient(135deg, rgba(16,185,129,.25), rgba(52,211,153,.12))'
+            : 'linear-gradient(135deg, rgba(31,41,55,.7), rgba(17,24,39,.5))';
+        btn.style.borderColor = active ? 'rgba(52,211,153,.45)' : 'rgba(75,85,99,.3)';
+        btn.style.color = active ? '#34d399' : '#9ca3af';
+        btn.title = active ? 'Disable auto voice replies' : 'Enable auto voice replies';
+        if (text) text.textContent = active ? 'Auto Voice: On' : 'Auto Voice: Off';
+    }
+
+    function updatePlaybackControls() {
+        const playBtn = document.getElementById('ev-tts-play') as HTMLButtonElement | null;
+        const pauseBtn = document.getElementById('ev-tts-pause') as HTMLButtonElement | null;
+        const stopBtn = document.getElementById('ev-tts-stop') as HTMLButtonElement | null;
+        const pauseText = document.getElementById('ev-tts-pause-text');
+
+        if (playBtn) {
+            const canPlay = Boolean(lastAssistantReply) || Boolean(audioPlayer);
+            playBtn.disabled = !canPlay;
+            playBtn.style.opacity = canPlay ? '1' : '.45';
+            playBtn.style.cursor = canPlay ? 'pointer' : 'not-allowed';
+        }
+
+        const hasPlayer = Boolean(audioPlayer);
+        if (pauseBtn) {
+            pauseBtn.disabled = !hasPlayer;
+            pauseBtn.style.opacity = hasPlayer ? '1' : '.45';
+            pauseBtn.style.cursor = hasPlayer ? 'pointer' : 'not-allowed';
+            if (pauseText) pauseText.textContent = audioPlayer?.paused ? 'Resume' : 'Pause';
+        }
+
+        if (stopBtn) {
+            stopBtn.disabled = !hasPlayer;
+            stopBtn.style.opacity = hasPlayer ? '1' : '.45';
+            stopBtn.style.cursor = hasPlayer ? 'pointer' : 'not-allowed';
+        }
+    }
+
+    function cleanupRecordingStream() {
+        if (recordingStream) {
+            recordingStream.getTracks().forEach(track => track.stop());
+            recordingStream = null;
+        }
+    }
+
+    function clearRecordingTicker() {
+        if (recordingTicker !== null) {
+            window.clearInterval(recordingTicker);
+            recordingTicker = null;
+        }
+    }
+
+    function normalizedSpeechText(text: string): string {
+        return text
+            .replace(/```[\s\S]*?```/g, ' ')
+            .replace(/`[^`]*`/g, ' ')
+            .replace(/[>#*_~\[\]()]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    async function transcribeAudioBlob(blob: Blob, inputEl: HTMLInputElement) {
+        if (isTranscribing) return;
+        isTranscribing = true;
+        setVoiceStatus('Transcribing audio...', 'info');
+        setVoiceHint('Listening to your recorded input');
+        try {
+            const ext = blob.type.includes('ogg')
+                ? 'ogg'
+                : blob.type.includes('mp4') || blob.type.includes('m4a')
+                    ? 'm4a'
+                    : blob.type.includes('wav')
+                        ? 'wav'
+                        : 'webm';
+
+            const audioFile = new File([blob], `voice-input.${ext}`, {
+                type: blob.type || 'audio/webm',
+            });
+
+            const result = await api.speechToText(audioFile);
+            const transcript = result.text?.trim();
+            if (!transcript) {
+                setVoiceStatus('No speech detected. Please try again.', 'error');
+                setVoiceHint('Try speaking closer to the microphone');
+                return;
+            }
+
+            inputEl.value = inputEl.value.trim()
+                ? `${inputEl.value.trim()} ${transcript}`
+                : transcript;
+            inputEl.focus();
+            setVoiceStatus(`Voice recognized (${result.language.toUpperCase()})`, 'success');
+            setVoiceHint('You can edit the transcribed text before sending');
+        } catch (err) {
+            const msg = (err as Error).message || 'Voice transcription failed';
+            setVoiceStatus(`Voice input failed: ${msg}`, 'error');
+            setVoiceHint('Check microphone permission and try again');
+        } finally {
+            isTranscribing = false;
+            clearRecordingTicker();
+            updateMicButton(false);
+        }
+    }
+
+    async function startRecording(inputEl: HTMLInputElement) {
+        if (isRecording) return;
+        if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+            setVoiceStatus('This browser does not support microphone recording.', 'error');
+            setVoiceHint('Use latest Chrome/Edge for voice input');
+            return;
+        }
+
+        try {
+            recordingStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const candidates = [
+                'audio/webm;codecs=opus',
+                'audio/webm',
+                'audio/ogg;codecs=opus',
+                'audio/mp4',
+            ];
+            const mimeType = candidates.find(type => MediaRecorder.isTypeSupported(type));
+            recorder = mimeType
+                ? new MediaRecorder(recordingStream, { mimeType })
+                : new MediaRecorder(recordingStream);
+
+            audioChunks = [];
+            recorder.ondataavailable = e => {
+                if (e.data.size > 0) audioChunks.push(e.data);
+            };
+            recorder.onstop = async () => {
+                const blob = new Blob(audioChunks, { type: recorder?.mimeType || 'audio/webm' });
+                cleanupRecordingStream();
+                await transcribeAudioBlob(blob, inputEl);
+            };
+
+            recorder.start();
+            isRecording = true;
+            recordingStartedAt = Date.now();
+            clearRecordingTicker();
+            recordingTicker = window.setInterval(() => {
+                const elapsed = Math.floor((Date.now() - recordingStartedAt) / 1000);
+                setVoiceStatus(`Recording ${formatDuration(elapsed)}...`, 'info');
+            }, 250);
+
+            updateMicButton(true);
+            setVoiceHint('Tap Stop Voice when you finish speaking');
+        } catch (err) {
+            cleanupRecordingStream();
+            clearRecordingTicker();
+            isRecording = false;
+            updateMicButton(false);
+            const msg = (err as Error).message || 'Microphone access denied';
+            setVoiceStatus(`Unable to start recording: ${msg}`, 'error');
+            setVoiceHint('Allow microphone permission in browser settings');
+        }
+    }
+
+    function stopRecording() {
+        if (!recorder || !isRecording) return;
+        isRecording = false;
+        clearRecordingTicker();
+        setVoiceStatus('Processing recording...', 'info');
+        setVoiceHint('Converting speech into text');
+        recorder.stop();
+    }
+
+    function stopAudioPlayback(announce = true) {
+        if (!audioPlayer) {
+            updatePlaybackControls();
+            return;
+        }
+
+        const player = audioPlayer;
+        audioPlayer = null;
+        player.onended = null;
+        player.onerror = null;
+        player.onpause = null;
+        player.onplay = null;
+        player.pause();
+        player.currentTime = 0;
+        if (player.src.startsWith('blob:')) URL.revokeObjectURL(player.src);
+
+        if (announce) {
+            setVoiceStatus(ttsEnabled ? 'Auto voice ON' : 'Voice ready', 'success');
+            setVoiceHint('Use Speak Last to hear the latest assistant reply');
+        }
+        updatePlaybackControls();
+    }
+
+    async function toggleAudioPause() {
+        if (!audioPlayer) return;
+        try {
+            if (audioPlayer.paused) {
+                await audioPlayer.play();
+                setVoiceStatus('Voice resumed', 'success');
+                setVoiceHint('Voice reply is now playing');
+            } else {
+                audioPlayer.pause();
+                setVoiceStatus('Voice paused', 'info');
+                setVoiceHint('Tap Resume to continue playback');
+            }
+        } catch {
+            setVoiceStatus('Unable to change playback state.', 'error');
+        } finally {
+            updatePlaybackControls();
+        }
+    }
+
+    async function speakLastReply() {
+        if (!lastAssistantReply) {
+            setVoiceStatus('No assistant reply yet to read aloud.', 'error');
+            setVoiceHint('Send a message first, then tap Speak Last');
+            return;
+        }
+        await playTts(lastAssistantReply);
+    }
+
+    async function playTts(text: string) {
+        const clean = normalizedSpeechText(text).slice(0, 3800);
+        if (!clean) return;
+
+        try {
+            setVoiceStatus('Generating speech...', 'info');
+            setVoiceHint(`Voice: ${ttsLanguage.toUpperCase()} | ${ttsSlow ? 'Slow' : 'Normal'} speed`);
+            stopAudioPlayback(false);
+
+            const audioBlob = await api.textToSpeech(clean, ttsLanguage, ttsSlow);
+            const url = URL.createObjectURL(audioBlob);
+            const player = new Audio(url);
+            audioPlayer = player;
+            player.volume = ttsVolume;
+
+            player.onplay = () => {
+                setVoiceStatus('Speaking assistant reply...', 'success');
+                setVoiceHint('Use Pause or Stop to control playback');
+                updatePlaybackControls();
+            };
+
+            player.onpause = () => {
+                if (audioPlayer === player && !player.ended) {
+                    setVoiceStatus('Voice paused', 'info');
+                    setVoiceHint('Tap Resume to continue');
+                    updatePlaybackControls();
+                }
+            };
+
+            player.onended = () => {
+                if (player.src.startsWith('blob:')) URL.revokeObjectURL(player.src);
+                if (audioPlayer === player) {
+                    audioPlayer = null;
+                }
+                setVoiceStatus(ttsEnabled ? 'Auto voice ON' : 'Voice ready', 'success');
+                setVoiceHint('Voice playback finished');
+                updatePlaybackControls();
+            };
+
+            player.onerror = () => {
+                if (player.src.startsWith('blob:')) URL.revokeObjectURL(player.src);
+                if (audioPlayer === player) {
+                    audioPlayer = null;
+                }
+                setVoiceStatus('Audio playback failed.', 'error');
+                setVoiceHint('Try again or switch language/speed');
+                updatePlaybackControls();
+            };
+
+            await player.play();
+        } catch (err) {
+            const msg = (err as Error).message || 'Text to speech failed';
+            setVoiceStatus(`TTS failed: ${msg}`, 'error');
+            setVoiceHint('Check backend speech service and try again');
+            updatePlaybackControls();
+        }
+    }
+
     // ── Thinking indicator ────────────────────────────────────────────────
     function showThinking() {
         const box = document.getElementById('ev-messages');
@@ -346,9 +705,18 @@ export async function renderRAGChatPage() {
             const r = mode === 'document' && sessionId ? await api.docChat(text, sessionId) : await api.freeChat(text);
             hideThinking();
             messages.push({ id: uid(), role: 'assistant', content: r.response, timestamp: new Date(), processingTime: r.processing_time });
+            lastAssistantReply = r.response;
+            if (ttsEnabled) {
+                await playTts(r.response);
+            }
         } catch (err) {
             hideThinking();
             const msg = (err as Error).message;
+            if (mode === 'document' && /session not found/i.test(msg)) {
+                rmDoc();
+                addMsg('assistant', 'Your document session expired (usually after backend restart). Please upload the file again and continue.');
+                return;
+            }
             const net = msg.includes('Failed to fetch') || msg.includes('aborted');
             addMsg('assistant', net ? 'Unable to reach the backend. Check that the API is running on port 8001.' : `Error: ${msg}`, false);
             if (net) { online = false; setHealth(false, 0); }
@@ -476,6 +844,14 @@ export async function renderRAGChatPage() {
     @keyframes evPulse { 0%, 100% { opacity:1 } 50% { opacity:.7 } }
     @keyframes evShimmer { 0% { transform:translateX(-100%) } 100% { transform:translateX(100%) } }
     @keyframes evGlow { 0%, 100% { box-shadow:0 0 20px rgba(212,175,55,.2) } 50% { box-shadow:0 0 30px rgba(212,175,55,.4), 0 0 40px rgba(212,175,55,.2) } }
+    @keyframes evMicRing {
+        0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, .45), 0 8px 24px rgba(239, 68, 68, .2); }
+        70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0), 0 8px 24px rgba(239, 68, 68, .2); }
+        100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0), 0 8px 24px rgba(239, 68, 68, .2); }
+    }
+    .ev-mic-recording { animation: evMicRing 1.4s infinite; }
+    .ev-voice-pill { transition: all .2s ease; }
+    .ev-voice-pill:hover { transform: translateY(-1px); }
     .ev-logo-animate { animation:evGlow 4s infinite }
     .ev-msg-row { animation:evFadeIn .4s cubic-bezier(0.4, 0, 0.2, 1) }
     .ev-msg-row:hover .ev-copy { opacity:1 !important }
@@ -604,7 +980,7 @@ export async function renderRAGChatPage() {
 
                         <!-- Input bar -->
                         <div style="border-top:1px solid rgba(75,85,99,.25);padding:16px 20px;background:linear-gradient(135deg, rgba(17,24,39,.7), rgba(31,41,55,.5));backdrop-filter:blur(8px)">
-                            <div style="display:flex;gap:10px">
+                            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
                                 <input
                                     type="text"
                                     id="ev-input"
@@ -615,6 +991,16 @@ export async function renderRAGChatPage() {
                                     onfocus="this.style.borderColor='rgba(212,175,55,.4)';this.style.boxShadow='0 0 0 3px rgba(212,175,55,.1)'"
                                     onblur="this.style.borderColor='rgba(75,85,99,.3)';this.style.boxShadow='none'"
                                 >
+                                <button
+                                    id="ev-mic"
+                                    class="ev-voice-pill"
+                                    style="display:flex;align-items:center;gap:8px;padding:12px 14px;background:linear-gradient(135deg, rgba(31,41,55,.9), rgba(17,24,39,.7));border:1px solid rgba(75,85,99,.35);border-radius:14px;color:#e5e7eb;cursor:pointer;transition:all .2s;font-size:12px;font-weight:600;min-width:126px;justify-content:center"
+                                    title="Start voice input"
+                                >
+                                    <span id="ev-mic-dot" style="width:7px;height:7px;border-radius:999px;background:#34d399;opacity:.75"></span>
+                                    <i id="ev-mic-icon" class="fa-solid fa-microphone-lines" style="font-size:13px"></i>
+                                    <span id="ev-mic-text">Start Voice</span>
+                                </button>
                                 <button
                                     id="ev-send"
                                     style="padding:12px 20px;background:linear-gradient(135deg, #D4AF37, #FFD700);border:none;border-radius:16px;color:#000;cursor:pointer;transition:all .3s;font-size:14px;font-weight:600;box-shadow:0 4px 12px rgba(212,175,55,.25);display:flex;align-items:center;gap:8px"
@@ -627,7 +1013,50 @@ export async function renderRAGChatPage() {
                                     <i class="fa-solid fa-rocket" style="font-size:12px"></i>
                                 </button>
                             </div>
+                            <div style="margin-top:10px;padding:10px 12px;border-radius:12px;background:linear-gradient(135deg, rgba(31,41,55,.35), rgba(17,24,39,.5));border:1px solid rgba(75,85,99,.22)">
+                                <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+                                    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                                        <button id="ev-tts-toggle" class="ev-voice-pill" style="display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:10px;border:1px solid rgba(75,85,99,.3);background:linear-gradient(135deg, rgba(31,41,55,.7), rgba(17,24,39,.5));color:#9ca3af;cursor:pointer;font-size:11px;font-weight:600">
+                                            <i class="fa-solid fa-wave-square" style="font-size:11px"></i>
+                                            <span id="ev-tts-toggle-text">Auto Voice: Off</span>
+                                        </button>
+                                        <button id="ev-tts-play" class="ev-voice-pill" style="display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:10px;border:1px solid rgba(75,85,99,.3);background:rgba(31,41,55,.6);color:#d1d5db;cursor:pointer;font-size:11px;font-weight:600">
+                                            <i class="fa-solid fa-play" style="font-size:10px"></i>
+                                            <span>Speak Last</span>
+                                        </button>
+                                        <button id="ev-tts-pause" class="ev-voice-pill" style="display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:10px;border:1px solid rgba(75,85,99,.3);background:rgba(31,41,55,.6);color:#d1d5db;cursor:pointer;font-size:11px;font-weight:600">
+                                            <i class="fa-solid fa-pause" style="font-size:10px"></i>
+                                            <span id="ev-tts-pause-text">Pause</span>
+                                        </button>
+                                        <button id="ev-tts-stop" class="ev-voice-pill" style="display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:10px;border:1px solid rgba(75,85,99,.3);background:rgba(31,41,55,.6);color:#d1d5db;cursor:pointer;font-size:11px;font-weight:600">
+                                            <i class="fa-solid fa-stop" style="font-size:10px"></i>
+                                            <span>Stop</span>
+                                        </button>
+                                    </div>
+                                    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                                        <label for="ev-tts-lang" style="font-size:10px;color:#9ca3af">Lang</label>
+                                        <select id="ev-tts-lang" style="background:rgba(17,24,39,.7);border:1px solid rgba(75,85,99,.32);color:#d1d5db;border-radius:8px;padding:6px 8px;font-size:11px;outline:none">
+                                            <option value="en">English</option>
+                                            <option value="hi">Hindi</option>
+                                            <option value="kn">Kannada</option>
+                                            <option value="ta">Tamil</option>
+                                            <option value="te">Telugu</option>
+                                            <option value="mr">Marathi</option>
+                                        </select>
+                                        <label for="ev-tts-speed" style="font-size:10px;color:#9ca3af">Speed</label>
+                                        <select id="ev-tts-speed" style="background:rgba(17,24,39,.7);border:1px solid rgba(75,85,99,.32);color:#d1d5db;border-radius:8px;padding:6px 8px;font-size:11px;outline:none">
+                                            <option value="normal">Normal</option>
+                                            <option value="slow">Slow</option>
+                                        </select>
+                                        <label for="ev-tts-volume" style="font-size:10px;color:#9ca3af">Vol</label>
+                                        <input id="ev-tts-volume" type="range" min="0" max="100" value="100" style="accent-color:#D4AF37;cursor:pointer;width:90px">
+                                        <span id="ev-tts-volume-label" style="font-size:10px;color:#9ca3af;min-width:34px">100%</span>
+                                    </div>
+                                </div>
+                            </div>
                             <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding:0 4px">
+                                <span id="ev-voice-status" style="font-size:11px;color:#9ca3af">Voice ready</span>
+                                <span id="ev-voice-hint" style="font-size:11px;color:#6b7280">Mic input + full playback controls</span>
                             </div>
                         </div>
                     </div>
@@ -642,6 +1071,15 @@ export async function renderRAGChatPage() {
     const uploadArea = document.getElementById('ev-upload-area')!;
     const fileInput  = document.getElementById('ev-file-input') as HTMLInputElement;
     const chatInput  = document.getElementById('ev-input') as HTMLInputElement;
+    const micBtn     = document.getElementById('ev-mic') as HTMLButtonElement;
+    const ttsBtn     = document.getElementById('ev-tts-toggle') as HTMLButtonElement;
+    const ttsPlayBtn = document.getElementById('ev-tts-play') as HTMLButtonElement;
+    const ttsPauseBtn = document.getElementById('ev-tts-pause') as HTMLButtonElement;
+    const ttsStopBtn = document.getElementById('ev-tts-stop') as HTMLButtonElement;
+    const ttsLangSel = document.getElementById('ev-tts-lang') as HTMLSelectElement;
+    const ttsSpeedSel = document.getElementById('ev-tts-speed') as HTMLSelectElement;
+    const ttsVolumeRange = document.getElementById('ev-tts-volume') as HTMLInputElement;
+    const ttsVolumeLabel = document.getElementById('ev-tts-volume-label');
     const sendBtn    = document.getElementById('ev-send') as HTMLButtonElement;
 
     uploadArea.addEventListener('click', () => fileInput.click());
@@ -674,6 +1112,44 @@ export async function renderRAGChatPage() {
 
     sendBtn.addEventListener('click', () => send(chatInput.value.trim()));
     chatInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(chatInput.value.trim()); } });
+    micBtn.addEventListener('click', async () => {
+        if (isTranscribing) return;
+        if (isRecording) {
+            stopRecording();
+            return;
+        }
+        await startRecording(chatInput);
+    });
+    ttsBtn.addEventListener('click', () => {
+        ttsEnabled = !ttsEnabled;
+        updateTtsButton(ttsEnabled);
+        setVoiceStatus(ttsEnabled ? 'Auto voice ON' : 'Auto voice OFF', 'success');
+        setVoiceHint(ttsEnabled ? 'Assistant replies will be spoken automatically' : 'Auto voice disabled; use Speak Last anytime');
+        if (!ttsEnabled && audioPlayer) {
+            stopAudioPlayback(false);
+        }
+        updatePlaybackControls();
+    });
+
+    ttsPlayBtn.addEventListener('click', () => { void speakLastReply(); });
+    ttsPauseBtn.addEventListener('click', () => { void toggleAudioPause(); });
+    ttsStopBtn.addEventListener('click', () => { stopAudioPlayback(); });
+
+    ttsLangSel.addEventListener('change', () => {
+        ttsLanguage = ttsLangSel.value;
+        setVoiceStatus(`Voice language set to ${ttsLangSel.options[ttsLangSel.selectedIndex].text}`, 'success');
+    });
+
+    ttsSpeedSel.addEventListener('change', () => {
+        ttsSlow = ttsSpeedSel.value === 'slow';
+        setVoiceStatus(`Voice speed: ${ttsSlow ? 'Slow' : 'Normal'}`, 'success');
+    });
+
+    ttsVolumeRange.addEventListener('input', () => {
+        ttsVolume = Number(ttsVolumeRange.value) / 100;
+        if (ttsVolumeLabel) ttsVolumeLabel.textContent = `${Math.round(ttsVolume * 100)}%`;
+        if (audioPlayer) audioPlayer.volume = ttsVolume;
+    });
 
     // Mobile sidebar
     const sidebar = document.getElementById('ev-sidebar')!;
@@ -720,12 +1196,24 @@ export async function renderRAGChatPage() {
     //  Init
     // ═══════════════════════════════════════════════════════════════════════
     updateMode();
+    updateMicButton(false);
+    updateTtsButton(false);
+    updatePlaybackControls();
+    setVoiceStatus('Voice ready', 'info');
+    setVoiceHint('Tap Start Voice or use playback controls for replies');
     renderMsgs();
     checkHealth();
     const hInterval = setInterval(checkHealth, 30_000);
 
     const obs = new MutationObserver(() => {
-        if (!document.getElementById('ev-messages')) { clearInterval(hInterval); obs.disconnect(); }
+        if (!document.getElementById('ev-messages')) {
+            clearInterval(hInterval);
+            if (isRecording) stopRecording();
+            clearRecordingTicker();
+            cleanupRecordingStream();
+            stopAudioPlayback(false);
+            obs.disconnect();
+        }
     });
     obs.observe(app, { childList: true });
 }

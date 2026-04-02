@@ -13,7 +13,9 @@ from __future__ import annotations
 
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from fastapi.responses import FileResponse
+from pydantic import BaseModel, Field
+from starlette.background import BackgroundTask
 import os, hashlib, shutil, uuid, time, logging
 from pathlib import Path
 from typing import Dict, Any, List, Optional
@@ -49,19 +51,161 @@ active_sessions: Dict[str, Any] = {}
 
 # ── lazy helpers ─────────────────────────────────────────────────────────────
 _llm_instance = None
+_vision_llm_instance = None
+_whisper_model = None
+
+
+def _safe_unlink(path: Path):
+    try:
+        path.unlink(missing_ok=True)
+    except TypeError:
+        # Python versions without missing_ok support
+        if path.exists():
+            path.unlink()
+    except Exception as exc:
+        logger.warning("⚠️ Failed to cleanup file %s: %s", path, exc)
 
 
 def _get_llm():
     """Return a cached ChatGoogleGenerativeAI instance (lazy-loaded)."""
     global _llm_instance
     if _llm_instance is None:
-        from langchain_google_genai import ChatGoogleGenerativeAI
-        _llm_instance = ChatGoogleGenerativeAI(
-            temperature=0.6,
-            model="gemini-2.5-flash",
-        )
-        logger.info("LLM initialised (gemini-2.5-flash)")
+        try:
+            # Get API key from environment
+            api_key = os.getenv('GEMINI_API_KEY') or os.getenv('GOOGLE_API_KEY')
+            
+            if not api_key:
+                logger.error("❌ No GEMINI_API_KEY or GOOGLE_API_KEY found in environment variables!")
+                raise ValueError("GEMINI_API_KEY environment variable not set")
+            
+            # Set the environment variable for Google Auth
+            os.environ['GOOGLE_API_KEY'] = api_key
+            
+            from langchain_google_genai import ChatGoogleGenerativeAI
+            _llm_instance = ChatGoogleGenerativeAI(
+                temperature=0.6,
+                model="gemini-2.5-flash",
+                google_api_key=api_key
+            )
+            logger.info("✅ LLM initialised (gemini-2.5-flash) with Google API key")
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize LLM: {str(e)}")
+            raise
     return _llm_instance
+
+
+def _get_vision_llm():
+    """Return a cached ChatGoogleGenerativeAI instance optimized for vision (lazy-loaded)."""
+    global _vision_llm_instance
+    if _vision_llm_instance is None:
+        try:
+            # Get API key from environment
+            api_key = os.getenv('GEMINI_API_KEY') or os.getenv('GOOGLE_API_KEY')
+            
+            if not api_key:
+                logger.error("❌ No GEMINI_API_KEY or GOOGLE_API_KEY found in environment variables!")
+                raise ValueError("GEMINI_API_KEY environment variable not set")
+            
+            # Set the environment variable for Google Auth
+            os.environ['GOOGLE_API_KEY'] = api_key
+            
+            from langchain_google_genai import ChatGoogleGenerativeAI
+            _vision_llm_instance = ChatGoogleGenerativeAI(
+                temperature=0.6,
+                model="gemini-2.5-flash-image",
+                google_api_key=api_key
+            )
+            logger.info("✅ Vision LLM initialised (gemini-2.5-flash-image) with Google API key")
+        except Exception as e:
+            logger.error(f"⚠️  Failed to initialize Vision LLM, falling back to regular LLM: {str(e)}")
+            # Fallback to regular LLM if vision LLM fails
+            return _get_llm()
+    return _vision_llm_instance
+
+
+def _get_whisper_model():
+    """Return a cached faster-whisper model instance (lazy-loaded)."""
+    global _whisper_model
+    if _whisper_model is None:
+        model_name = os.getenv("WHISPER_MODEL", "base")
+        device = os.getenv("WHISPER_DEVICE", "cpu")
+        compute_type = os.getenv("WHISPER_COMPUTE_TYPE", "int8")
+        try:
+            from faster_whisper import WhisperModel
+
+            _whisper_model = WhisperModel(
+                model_name,
+                device=device,
+                compute_type=compute_type,
+            )
+            logger.info(
+                "✅ Whisper model initialised (%s, device=%s, compute_type=%s)",
+                model_name,
+                device,
+                compute_type,
+            )
+        except ImportError as exc:
+            raise RuntimeError(
+                "faster-whisper is not installed. Install it with `pip install faster-whisper`."
+            ) from exc
+        except Exception as exc:
+            logger.error("❌ Failed to initialize Whisper model: %s", exc)
+            raise RuntimeError(f"Failed to initialize Whisper model: {exc}") from exc
+    return _whisper_model
+
+
+def _extract_pdf_text_pdfminer(file_path: str) -> str:
+    """Try extracting text with pdfminer."""
+    from pdfminer.high_level import extract_text
+
+    return (extract_text(file_path) or "").strip()
+
+
+def _extract_pdf_text_pypdf(file_path: str) -> str:
+    """Fallback extraction with pypdf for PDFs where pdfminer fails."""
+    from pypdf import PdfReader
+
+    reader = PdfReader(file_path)
+    extracted: List[str] = []
+    for page in reader.pages:
+        text = (page.extract_text() or "").strip()
+        if text:
+            extracted.append(text)
+    return "\n\n".join(extracted).strip()
+
+
+def _extract_pdf_text_ocr(file_path: str) -> str:
+    """Last-resort OCR for scanned PDFs.
+
+    This may require system tools (poppler + tesseract). If unavailable, it
+    returns an empty string and lets the caller decide how to proceed.
+    """
+    max_pages = int(os.getenv("PDF_OCR_MAX_PAGES", "20"))
+    dpi = int(os.getenv("PDF_OCR_DPI", "200"))
+
+    try:
+        from pdf2image import convert_from_path
+        import pytesseract
+    except Exception as exc:
+        logger.warning("⚠️ OCR dependencies unavailable: %s", exc)
+        return ""
+
+    try:
+        pages = convert_from_path(file_path, dpi=dpi, first_page=1, last_page=max_pages)
+    except Exception as exc:
+        logger.warning("⚠️ OCR page conversion failed: %s", exc)
+        return ""
+
+    extracted: List[str] = []
+    for idx, page in enumerate(pages, start=1):
+        try:
+            text = (pytesseract.image_to_string(page) or "").strip()
+            if text:
+                extracted.append(text)
+        except Exception as exc:
+            logger.warning("⚠️ OCR failed on page %s: %s", idx, exc)
+
+    return "\n\n".join(extracted).strip()
 
 
 # ── Indian EV system prompt ─────────────────────────────────────────────────
@@ -128,6 +272,19 @@ class UploadResponse(BaseModel):
     document_count: int
 
 
+class SpeechToTextResponse(BaseModel):
+    text: str
+    language: str
+    processing_time: float
+    model: str
+
+
+class TextToSpeechRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=4000)
+    language: str = Field(default="en", min_length=2, max_length=10)
+    slow: bool = False
+
+
 # ── Simple retriever ────────────────────────────────────────────────────────
 class SimpleInMemoryRetriever:
     def __init__(self):
@@ -180,6 +337,84 @@ async def free_chat(request: FreeChatRequest):
     except Exception as exc:
         logger.error("free-chat error: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+# ── speech to text (Whisper) ───────────────────────────────────────────────
+@app.post("/speech-to-text", response_model=SpeechToTextResponse)
+async def speech_to_text(file: UploadFile = File(...)):
+    """Transcribe uploaded speech audio to text using Whisper."""
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Filename is required.")
+
+    allowed_audio = (".wav", ".mp3", ".m4a", ".webm", ".ogg", ".flac", ".aac")
+    if not file.filename.lower().endswith(allowed_audio):
+        raise HTTPException(
+            status_code=400,
+            detail="Only audio files are accepted: .wav, .mp3, .m4a, .webm, .ogg, .flac, .aac",
+        )
+
+    temp_audio = DATA_DIR / f"stt_{uuid.uuid4().hex}_{Path(file.filename).name}"
+    start = time.time()
+    try:
+        with open(temp_audio, "wb") as buf:
+            shutil.copyfileobj(file.file, buf)
+
+        model = _get_whisper_model()
+        segments, info = model.transcribe(
+            str(temp_audio),
+            beam_size=5,
+            vad_filter=True,
+        )
+
+        transcript = " ".join(seg.text.strip() for seg in segments if seg.text).strip()
+        language = getattr(info, "language", "unknown")
+
+        return SpeechToTextResponse(
+            text=transcript,
+            language=language,
+            processing_time=time.time() - start,
+            model=os.getenv("WHISPER_MODEL", "base"),
+        )
+    except RuntimeError as exc:
+        logger.error("speech-to-text setup error: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+    except Exception as exc:
+        logger.error("speech-to-text error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Speech transcription failed: {exc}")
+    finally:
+        _safe_unlink(temp_audio)
+
+
+# ── text to speech ──────────────────────────────────────────────────────────
+@app.post("/text-to-speech")
+async def text_to_speech(request: TextToSpeechRequest):
+    """Synthesize speech audio (MP3) from text input."""
+    out_path = DATA_DIR / f"tts_{uuid.uuid4().hex}.mp3"
+    try:
+        from gtts import gTTS
+
+        tts = gTTS(text=request.text, lang=request.language, slow=request.slow)
+        tts.save(str(out_path))
+
+        return FileResponse(
+            path=str(out_path),
+            media_type="audio/mpeg",
+            filename="speech.mp3",
+            background=BackgroundTask(_safe_unlink, out_path),
+        )
+    except ImportError:
+        raise HTTPException(
+            status_code=500,
+            detail="gTTS is not installed. Install it with `pip install gTTS`.",
+        )
+    except ValueError as exc:
+        logger.error("text-to-speech validation error: %s", exc)
+        _safe_unlink(out_path)
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        logger.error("text-to-speech error: %s", exc, exc_info=True)
+        _safe_unlink(out_path)
+        raise HTTPException(status_code=500, detail=f"Text-to-speech synthesis failed: {exc}")
 
 
 # ── File upload (PDF & Images) ────────────────────────────────────────────────
@@ -309,8 +544,7 @@ async def delete_session(session_id: str):
 # ═══════════════════════════════════════════════════════════════════════════
 
 def _process_pdf(file_path: str, session_id: str) -> SimpleInMemoryRetriever:
-    """Extract content from the PDF using lightweight pdfminer."""
-    from pdfminer.high_level import extract_text
+    """Extract content from the PDF with layered fallbacks."""
     
     # Verify file exists
     if not Path(file_path).exists():
@@ -320,12 +554,27 @@ def _process_pdf(file_path: str, session_id: str) -> SimpleInMemoryRetriever:
     logger.info(f"📄 Processing PDF: {Path(file_path).name} ({file_size / 1024:.1f} KB)")
 
     try:
-        # Extract text using pdfminer (lightweight, no PyTorch/inference libs needed)
-        logger.info("🔍 Extracting text from PDF...")
-        full_text = extract_text(file_path)
-        
-        if not full_text or not full_text.strip():
-            raise ValueError("PDF contains no extractable text (empty or corrupted)")
+        # Step 1: pdfminer (fast for digital PDFs)
+        logger.info("🔍 Extracting text from PDF with pdfminer...")
+        full_text = _extract_pdf_text_pdfminer(file_path)
+
+        # Step 2: pypdf fallback
+        if not full_text:
+            logger.warning("⚠️ pdfminer returned no text; trying pypdf fallback...")
+            full_text = _extract_pdf_text_pypdf(file_path)
+
+        # Step 3: OCR fallback for scanned documents
+        if not full_text:
+            logger.warning("⚠️ pypdf returned no text; trying OCR fallback...")
+            full_text = _extract_pdf_text_ocr(file_path)
+
+        # Final fallback: keep flow alive with a clear placeholder
+        if not full_text:
+            logger.warning("⚠️ No extractable text found after all fallbacks; creating placeholder context")
+            full_text = (
+                f"Document '{Path(file_path).name}' appears to be image-based or contains no selectable text. "
+                "Text extraction could not recover readable content."
+            )
         
         logger.info(f"✅ Extracted text: {len(full_text)} characters")
         
@@ -374,9 +623,6 @@ def _process_pdf(file_path: str, session_id: str) -> SimpleInMemoryRetriever:
     except FileNotFoundError as exc:
         logger.error(f"❌ File error: {exc}")
         raise
-    except ValueError as exc:
-        logger.error(f"❌ PDF content error: {exc}")
-        raise
     except Exception as exc:
         logger.error(f"❌ PDF processing error: {exc}", exc_info=True)
         raise Exception(f"Failed to process PDF: {str(exc)}")
@@ -417,9 +663,9 @@ def _process_image(file_path: str, session_id: str) -> SimpleInMemoryRetriever:
         img_size = img.size
         logger.info(f"✅ Image validated: {img_size[0]}x{img_size[1]} pixels")
         
-        # Use LLM for image analysis
+        # Use vision LLM for image analysis
         logger.info("📝 Analyzing image with vision model...")
-        model = _get_llm()
+        model = _get_vision_llm()
         
         # Encode image to base64
         with open(file_path, "rb") as f:
