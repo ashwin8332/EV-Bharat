@@ -36,6 +36,14 @@ interface RealTimeData {
     rul: number;
 }
 
+function getBatteryApiBaseUrl(): string {
+    const configured = (import.meta.env.VITE_BATTERY_API_URL as string | undefined)?.trim();
+    const fallback = '/api/battery';
+    return (configured && configured.length > 0 ? configured : fallback).replace(/\/+$/, '');
+}
+
+const BATTERY_API_BASE_URL = getBatteryApiBaseUrl();
+
 export async function renderBatteryAnalyticsPage() {
     if (!authService.isAuthenticated()) {
         window.location.href = '/auth';
@@ -661,8 +669,6 @@ function initializeBatteryAnalyticsPage() {
 async function simulateMLPrediction(input: any): Promise<BatteryAnalysis> {
     try {
         // Try to call the real ML API first
-        const mlApiUrl = 'http://localhost:8000';
-        
         const requestBody = {
             voltage: input.voltage,
             current: input.current,
@@ -671,7 +677,7 @@ async function simulateMLPrediction(input: any): Promise<BatteryAnalysis> {
             age_days: input.age_days || (input.cell_age === 'fresh' ? 200 : 800)
         };
         
-        const response = await fetch(`${mlApiUrl}/predict`, {
+        const response = await fetch(`${BATTERY_API_BASE_URL}/predict`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -787,7 +793,7 @@ async function simulateMLPrediction(input: any): Promise<BatteryAnalysis> {
                 risk_level: riskLevel,
                 alerts,
                 intelligence_version: 'EVBharat AI v2.1',
-                assessment_confidence: Math.round((0.85 + Math.random() * 0.1) * 100)
+                assessment_confidence: Number((0.85 + Math.random() * 0.1).toFixed(3))
             }
         };
     }

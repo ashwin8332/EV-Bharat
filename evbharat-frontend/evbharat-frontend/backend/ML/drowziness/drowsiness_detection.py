@@ -14,6 +14,7 @@ import subprocess
 import threading
 import time
 import csv
+from contextlib import contextmanager
 from pathlib import Path
 import urllib.request
 
@@ -25,6 +26,65 @@ from drowsiness_analyzer import (
 )
 
 warnings.filterwarnings('ignore')
+
+
+def _is_truthy_env(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _configure_mediapipe_runtime() -> None:
+    """Reduce noisy native logging from MediaPipe/TFLite on startup."""
+    os.environ.setdefault("MEDIAPIPE_DISABLE_GPU", "1")
+    os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
+    os.environ.setdefault("GLOG_minloglevel", "2")
+    os.environ.setdefault("ABSL_MIN_LOG_LEVEL", "2")
+
+
+LANDMARK_BACKEND_MODE = os.getenv("DROWSINESS_LANDMARK_BACKEND", "auto").strip().lower()
+if LANDMARK_BACKEND_MODE not in {"auto", "facemesh", "tasks"}:
+    LANDMARK_BACKEND_MODE = "auto"
+
+ENABLE_BLENDSHAPES = _is_truthy_env("DROWSINESS_ENABLE_BLENDSHAPES", default=True)
+VERBOSE_DROWSINESS_LOGS = _is_truthy_env("DROWSINESS_VERBOSE_LOGS", default=False)
+
+
+@contextmanager
+def _suppress_native_stderr():
+    """Temporarily silence native stderr writes (C/C++ extensions)."""
+    try:
+        stderr_fd = sys.stderr.fileno()
+    except Exception:
+        yield
+        return
+
+    saved_stderr_fd = None
+    devnull = None
+    try:
+        try:
+            sys.stderr.flush()
+        except Exception:
+            pass
+
+        saved_stderr_fd = os.dup(stderr_fd)
+        devnull = open(os.devnull, "w")
+        os.dup2(devnull.fileno(), stderr_fd)
+        yield
+    finally:
+        try:
+            if saved_stderr_fd is not None:
+                try:
+                    sys.stderr.flush()
+                except Exception:
+                    pass
+                os.dup2(saved_stderr_fd, stderr_fd)
+        finally:
+            if saved_stderr_fd is not None:
+                os.close(saved_stderr_fd)
+            if devnull is not None:
+                devnull.close()
 
 # ============================================================================
 # ⚙️ CONFIGURATION & SESSION TRACKING
@@ -109,8 +169,20 @@ _last_alert_time = 0.0
 
 def _ensure_mediapipe():
     """Import mediapipe, installing it with the current interpreter if needed."""
+    _configure_mediapipe_runtime()
+
+    def _configure_absl_python_logging() -> None:
+        try:
+            from absl import logging as absl_logging  # type: ignore
+
+            absl_logging.set_verbosity(absl_logging.ERROR)
+            absl_logging.set_stderrthreshold("error")
+        except Exception:
+            pass
+
     try:
         import mediapipe as mp  # type: ignore
+        _configure_absl_python_logging()
         return mp
     except ImportError:
         print("MediaPipe not installed. Installing with current Python environment...")
@@ -123,11 +195,15 @@ def _ensure_mediapipe():
             )
 
         import mediapipe as mp  # type: ignore
+        _configure_absl_python_logging()
         return mp
 
 
 def _create_face_mesh(mp_module):
     """Create FaceMesh object with compatible import paths across mediapipe builds."""
+    if LANDMARK_BACKEND_MODE == "tasks":
+        return None
+
     try:
         if hasattr(mp_module, "solutions") and hasattr(mp_module.solutions, "face_mesh"):
             face_mesh_api = mp_module.solutions.face_mesh
@@ -140,11 +216,9 @@ def _create_face_mesh(mp_module):
             min_detection_confidence=0.5,
             min_tracking_confidence=0.5,
         )
-    except Exception as exc:
-        print(
-            "MediaPipe FaceMesh is unavailable in this environment.\n"
-            "Trying MediaPipe Tasks FaceLandmarker fallback..."
-        )
+    except Exception:
+        if VERBOSE_DROWSINESS_LOGS:
+            print("MediaPipe FaceMesh unavailable; using FaceLandmarker fallback.")
         return None
 
 
@@ -178,6 +252,9 @@ def _ensure_face_landmarker_model() -> Path:
 
 def _create_face_landmarker(mp_module):
     """Create a MediaPipe Tasks FaceLandmarker (fallback for environments where FaceMesh fails)."""
+    if LANDMARK_BACKEND_MODE == "facemesh":
+        return None
+
     try:
         model_path = _ensure_face_landmarker_model()
         BaseOptions = mp_module.tasks.BaseOptions
@@ -192,10 +269,11 @@ def _create_face_landmarker(mp_module):
             min_face_detection_confidence=float(DetectionConfig.DETECTION_CONFIDENCE),
             min_face_presence_confidence=float(DetectionConfig.DETECTION_CONFIDENCE),
             min_tracking_confidence=float(DetectionConfig.TRACKING_CONFIDENCE),
-            output_face_blendshapes=True,
+            output_face_blendshapes=ENABLE_BLENDSHAPES,
             output_facial_transformation_matrixes=False,
         )
-        return FaceLandmarker.create_from_options(options)
+        with _suppress_native_stderr():
+            return FaceLandmarker.create_from_options(options)
     except Exception as exc:
         print(f"⚠️  FaceLandmarker fallback unavailable: {exc}")
         return None
@@ -205,6 +283,18 @@ face_landmarker = None
 if face_mesh is None:
     # Try Tasks API as a fallback (helps on some Python 3.13 wheels).
     face_landmarker = _create_face_landmarker(mp)
+
+
+def get_active_landmark_backend() -> str:
+    """Return currently active landmark backend."""
+    if face_mesh is not None:
+        return "FaceMesh"
+    if face_landmarker is not None:
+        return "FaceLandmarker"
+    return "Unavailable"
+
+
+ACTIVE_LANDMARK_BACKEND = get_active_landmark_backend()
 
 
 def _load_face_recognition():

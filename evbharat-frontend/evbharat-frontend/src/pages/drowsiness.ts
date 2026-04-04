@@ -16,11 +16,19 @@ interface DrowsinessStatus {
     mar?: number;
     ear_threshold?: number;
     mar_threshold?: number;
+    camera_available?: boolean;
+    camera_error?: string;
+    source?: string;
+    sensitivity_score?: number;
+    sensitivity_state?: 'stable' | 'sensitive' | 'emotional' | string;
+    sensitivity_parameters?: Record<string, number>;
+    landmark_backend?: string;
+    processing_active?: boolean;
 }
 
 const API_STORAGE_KEY = 'evbharat_drowsiness_api_base';
 const API_BASE_DEFAULT = (import.meta.env.VITE_DROWSINESS_API_URL as string | undefined)?.trim() || '/api/drowsiness';
-const POLL_INTERVAL_MS = 1000;
+const POLL_INTERVAL_MS = 2500;
 
 let statusPollInterval: ReturnType<typeof setInterval> | null = null;
 let requestInFlight = false;
@@ -91,11 +99,14 @@ export async function renderDrowsinessPage() {
                                 class="w-full px-4 py-3 bg-gray-800/50 border border-pagani-gold/30 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-pagani-gold transition-all"
                                 placeholder="/api/drowsiness"
                             />
-                            <p class="text-xs text-gray-500 mt-2">Default dev endpoint is <span class="text-pagani-gold">/api/drowsiness</span>. It proxies to <span class="text-pagani-gold">127.0.0.1:5000</span>.</p>
+                            <p class="text-xs text-gray-500 mt-2">Default dev endpoint is <span class="text-pagani-gold">/api/drowsiness</span>. It proxies to <span class="text-pagani-gold">127.0.0.1:8000/drowsiness</span>.</p>
                         </div>
                         <div class="flex items-end gap-3">
                             <button id="drowsiness-connect-btn" class="px-5 py-3 bg-pagani-gold/20 border border-pagani-gold/50 rounded-lg text-pagani-gold hover:bg-pagani-gold hover:text-black transition-all uppercase text-xs tracking-[0.18em] font-orbitron font-bold whitespace-nowrap">
                                 Connect
+                            </button>
+                            <button id="drowsiness-browser-cam-btn" class="px-5 py-3 border border-emerald-400/50 rounded-lg text-emerald-300 hover:bg-emerald-400/10 transition-all uppercase text-xs tracking-[0.12em] font-orbitron font-bold whitespace-nowrap">
+                                Use Browser Camera
                             </button>
                             <button id="drowsiness-voice-btn" class="px-5 py-3 border border-cyan-400/50 rounded-lg text-cyan-300 hover:bg-cyan-400/10 transition-all uppercase text-xs tracking-[0.12em] font-orbitron font-bold whitespace-nowrap">
                                 Voice Alerts Off
@@ -119,8 +130,9 @@ export async function renderDrowsinessPage() {
 
                             <div class="relative overflow-hidden rounded-xl border border-pagani-gold/20 bg-black/70 aspect-video">
                                 <img id="drowsiness-video-feed" alt="Drowsiness detector live feed" class="w-full h-full object-cover" loading="eager" />
-                                <div class="absolute top-3 left-3 px-2.5 py-1 rounded-lg border border-pagani-gold/50 bg-black/70 text-[11px] uppercase tracking-[0.2em] text-pagani-gold font-orbitron">
-                                    AI Monitor
+                                <video id="drowsiness-browser-video" class="w-full h-full object-cover hidden" autoplay playsinline muted></video>
+                                <div id="drowsiness-process-badge" class="absolute top-3 left-3 px-2.5 py-1 rounded-lg border border-pagani-gold/50 bg-black/70 text-[11px] uppercase tracking-[0.2em] text-pagani-gold font-orbitron">
+                                    AI Monitor • Initializing
                                 </div>
                             </div>
                         </div>
@@ -183,22 +195,21 @@ export async function renderDrowsinessPage() {
                                     <span class="text-gray-400">Alert Level</span>
                                     <span id="drowsiness-alert-level" class="font-orbitron text-white uppercase">none</span>
                                 </div>
+                                <div class="flex items-center justify-between p-3 rounded-lg bg-pagani-black/40 border border-pagani-gold/10">
+                                    <span class="text-gray-400">Sensitivity Score</span>
+                                    <span id="drowsiness-sensitivity-value" class="font-orbitron text-white">0%</span>
+                                </div>
+                                <div class="flex items-center justify-between p-3 rounded-lg bg-pagani-black/40 border border-pagani-gold/10">
+                                    <span class="text-gray-400">Emotion State</span>
+                                    <span id="drowsiness-emotion-state" class="font-orbitron text-white uppercase">stable</span>
+                                </div>
+                                <div class="flex items-center justify-between p-3 rounded-lg bg-pagani-black/40 border border-pagani-gold/10">
+                                    <span class="text-gray-400">Landmark Engine</span>
+                                    <span id="drowsiness-landmark-backend" class="font-orbitron text-white">--</span>
+                                </div>
                             </div>
                             <p id="drowsiness-alert-message" class="text-xs text-gray-500 mt-4">No active alert.</p>
-                        </div>
-
-                        <div class="bg-gradient-to-br from-gray-900 to-pagani-black border border-pagani-gold/20 rounded-xl p-6 fade-in-section" style="animation-delay: 120ms">
-                            <h3 class="text-lg font-orbitron font-bold mb-4 flex items-center gap-2">
-                                <i class="fa-solid fa-terminal text-pagani-gold"></i>
-                                Backend Quick Start
-                            </h3>
-                            <p class="text-sm text-gray-400 mb-3">Start the detector backend if the feed is offline:</p>
-                            <div class="p-3 rounded-lg border border-pagani-gold/20 bg-pagani-black/40 text-xs text-gray-300 font-mono leading-relaxed">
-                                cd backend/ML/drowziness
-                                <br />
-                                python web_server.py
-                            </div>
-                            <p class="text-xs text-gray-500 mt-3">Then keep this page open. It auto-refreshes status every second.</p>
+                            <p id="drowsiness-sensitivity-params" class="text-xs text-gray-500 mt-2">Sensitivity parameters: --</p>
                         </div>
                     </div>
                 </div>
@@ -209,9 +220,17 @@ export async function renderDrowsinessPage() {
     const root = document.getElementById('drowsiness-page-root');
     const backendInput = document.getElementById('drowsiness-api-base') as HTMLInputElement | null;
     const connectButton = document.getElementById('drowsiness-connect-btn') as HTMLButtonElement | null;
+    const browserCamButton = document.getElementById('drowsiness-browser-cam-btn') as HTMLButtonElement | null;
     const voiceButton = document.getElementById('drowsiness-voice-btn') as HTMLButtonElement | null;
     const videoFeed = document.getElementById('drowsiness-video-feed') as HTMLImageElement | null;
+    const browserVideo = document.getElementById('drowsiness-browser-video') as HTMLVideoElement | null;
     const sourceLabel = document.getElementById('drowsiness-source-label');
+
+    let usingBrowserCamera = false;
+    let browserStream: MediaStream | null = null;
+    let browserUploadInterval: ReturnType<typeof setInterval> | null = null;
+    let browserUploadInFlight = false;
+    const browserCanvas = document.createElement('canvas');
 
     if (backendInput) {
         backendInput.value = apiBase;
@@ -235,10 +254,148 @@ export async function renderDrowsinessPage() {
             return;
         }
 
+        if (usingBrowserCamera) {
+            if (sourceLabel) {
+                sourceLabel.textContent = 'browser://camera';
+            }
+            return;
+        }
+
         const separator = apiBase.includes('?') ? '&' : '?';
         videoFeed.src = `${apiBase}/video_feed${separator}v=${Date.now()}`;
         if (sourceLabel) {
             sourceLabel.textContent = apiBase;
+        }
+    };
+
+    const stopBrowserCamera = () => {
+        usingBrowserCamera = false;
+
+        if (browserUploadInterval) {
+            clearInterval(browserUploadInterval);
+            browserUploadInterval = null;
+        }
+
+        if (browserStream) {
+            for (const track of browserStream.getTracks()) {
+                track.stop();
+            }
+            browserStream = null;
+        }
+
+        if (browserVideo) {
+            browserVideo.pause();
+            browserVideo.srcObject = null;
+            browserVideo.classList.add('hidden');
+        }
+
+        if (videoFeed) {
+            videoFeed.classList.remove('hidden');
+        }
+
+        if (browserCamButton) {
+            browserCamButton.textContent = 'Use Browser Camera';
+            browserCamButton.className =
+                'px-5 py-3 border border-emerald-400/50 rounded-lg text-emerald-300 hover:bg-emerald-400/10 transition-all uppercase text-xs tracking-[0.12em] font-orbitron font-bold whitespace-nowrap';
+        }
+    };
+
+    const uploadBrowserFrame = async () => {
+        if (!usingBrowserCamera || browserUploadInFlight || !browserVideo || browserVideo.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+            return;
+        }
+
+        browserUploadInFlight = true;
+        try {
+            const width = browserVideo.videoWidth || 800;
+            const height = browserVideo.videoHeight || 500;
+
+            browserCanvas.width = width;
+            browserCanvas.height = height;
+
+            const ctx = browserCanvas.getContext('2d');
+            if (!ctx) {
+                return;
+            }
+
+            ctx.drawImage(browserVideo, 0, 0, width, height);
+
+            const blob = await new Promise<Blob | null>((resolve) => {
+                browserCanvas.toBlob(resolve, 'image/jpeg', 0.75);
+            });
+
+            if (!blob) {
+                return;
+            }
+
+            const body = new FormData();
+            body.append('frame', blob, 'browser-frame.jpg');
+
+            const response = await fetch(`${apiBase}/browser_frame`, {
+                method: 'POST',
+                body,
+                cache: 'no-store'
+            });
+
+            if (!response.ok) {
+                throw new Error(`Frame upload failed with code ${response.status}`);
+            }
+        } catch {
+            showOfflineState('Browser camera frame upload failed. Check backend and reconnect.');
+        } finally {
+            browserUploadInFlight = false;
+        }
+    };
+
+    const startBrowserCamera = async () => {
+        if (!navigator.mediaDevices?.getUserMedia) {
+            showOfflineState('Browser camera is not supported in this browser/environment.');
+            return;
+        }
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: 'user'
+                },
+                audio: false
+            });
+
+            stopBrowserCamera();
+
+            browserStream = stream;
+            usingBrowserCamera = true;
+
+            if (videoFeed) {
+                videoFeed.classList.add('hidden');
+            }
+
+            if (browserVideo) {
+                browserVideo.srcObject = stream;
+                browserVideo.classList.remove('hidden');
+                await browserVideo.play();
+            }
+
+            if (sourceLabel) {
+                sourceLabel.textContent = 'browser://camera';
+            }
+
+            if (browserCamButton) {
+                browserCamButton.textContent = 'Stop Browser Camera';
+                browserCamButton.className =
+                    'px-5 py-3 border border-red-400/60 rounded-lg text-red-300 bg-red-400/10 hover:bg-red-400/20 transition-all uppercase text-xs tracking-[0.12em] font-orbitron font-bold whitespace-nowrap';
+            }
+
+            setConnectionState(true);
+
+            browserUploadInterval = setInterval(() => {
+                void uploadBrowserFrame();
+            }, 200);
+
+            await uploadBrowserFrame();
+        } catch {
+            showOfflineState('Camera permission denied or no browser camera is available.');
+            stopBrowserCamera();
         }
     };
 
@@ -296,10 +453,19 @@ export async function renderDrowsinessPage() {
         const marValue = document.getElementById('drowsiness-mar-value');
         const alertLevelValue = document.getElementById('drowsiness-alert-level');
         const alertMessageValue = document.getElementById('drowsiness-alert-message');
+        const sensitivityValue = document.getElementById('drowsiness-sensitivity-value');
+        const emotionStateValue = document.getElementById('drowsiness-emotion-state');
+        const landmarkBackendValue = document.getElementById('drowsiness-landmark-backend');
+        const sensitivityParamsValue = document.getElementById('drowsiness-sensitivity-params');
+        const processBadge = document.getElementById('drowsiness-process-badge');
         const driverLabel = document.getElementById('drowsiness-driver-label');
         const driverDescription = document.getElementById('drowsiness-driver-description');
         const stateCard = document.getElementById('drowsiness-state-card');
         const updatedAt = document.getElementById('drowsiness-last-update');
+        const sensitivityScore = Number.isFinite(status.sensitivity_score) ? Math.max(0, Math.min(100, status.sensitivity_score ?? 0)) : 0;
+        const sensitivityState = (status.sensitivity_state || 'stable').toString();
+        const landmarkBackend = (status.landmark_backend || '--').toString();
+        const params = status.sensitivity_parameters || {};
 
         if (riskValue) {
             riskValue.textContent = `${risk}%`;
@@ -345,8 +511,38 @@ export async function renderDrowsinessPage() {
             alertMessageValue.className = `text-xs mt-4 ${status.alert_level === 'high' ? 'text-red-300' : status.alert_level === 'medium' ? 'text-yellow-300' : 'text-gray-500'}`;
         }
 
+        if (sensitivityValue) {
+            sensitivityValue.textContent = `${sensitivityScore}%`;
+            sensitivityValue.className = `font-orbitron ${sensitivityScore >= 70 ? 'text-red-400' : sensitivityScore >= 45 ? 'text-yellow-400' : 'text-green-400'}`;
+        }
+
+        if (emotionStateValue) {
+            emotionStateValue.textContent = sensitivityState;
+            emotionStateValue.className = `font-orbitron uppercase ${sensitivityScore >= 70 ? 'text-red-400' : sensitivityScore >= 45 ? 'text-yellow-400' : 'text-green-400'}`;
+        }
+
+        if (landmarkBackendValue) {
+            landmarkBackendValue.textContent = landmarkBackend;
+        }
+
+        if (sensitivityParamsValue) {
+            const frown = typeof params.frown === 'number' ? params.frown.toFixed(2) : '--';
+            const browUp = typeof params.brow_up === 'number' ? params.brow_up.toFixed(2) : '--';
+            const eyeWide = typeof params.eye_wide === 'number' ? params.eye_wide.toFixed(2) : '--';
+            const jawOpen = typeof params.jaw_open === 'number' ? params.jaw_open.toFixed(2) : '--';
+            sensitivityParamsValue.textContent = `Sensitivity parameters: frown=${frown}, brow_up=${browUp}, eye_wide=${eyeWide}, jaw_open=${jawOpen}`;
+        }
+
+        if (processBadge) {
+            const source = status.source || 'backend';
+            const activeText = status.processing_active ? 'Processing' : 'Idle';
+            processBadge.textContent = `AI Monitor • ${activeText} • ${landmarkBackend} • ${source}`;
+        }
+
         const isHighRisk = status.alert_level === 'high' || risk >= 85;
         const isMediumRisk = status.alert_level === 'medium' || risk >= 60;
+        const isEmotional = sensitivityScore >= 70 || sensitivityState === 'emotional';
+        const isSensitive = sensitivityScore >= 45 || sensitivityState === 'sensitive';
         const noFaceDetected = !status.face_present;
 
         if (driverLabel && driverDescription && stateCard) {
@@ -355,6 +551,16 @@ export async function renderDrowsinessPage() {
                 driverLabel.className = 'text-2xl font-orbitron font-bold text-red-400';
                 driverDescription.textContent = 'Driver appears drowsy. Please stop the vehicle safely and rest immediately.';
                 stateCard.className = 'bg-gradient-to-br from-red-500/15 to-red-900/10 border border-red-500/30 rounded-xl p-6 fade-in-section';
+            } else if (isEmotional) {
+                driverLabel.textContent = 'EMOTIONAL';
+                driverLabel.className = 'text-2xl font-orbitron font-bold text-orange-400';
+                driverDescription.textContent = 'High emotional stress detected. You may not concentrate to drive. Calm down before continuing.';
+                stateCard.className = 'bg-gradient-to-br from-orange-500/15 to-orange-900/10 border border-orange-500/30 rounded-xl p-6 fade-in-section';
+            } else if (isSensitive) {
+                driverLabel.textContent = 'SENSITIVE';
+                driverLabel.className = 'text-2xl font-orbitron font-bold text-yellow-400';
+                driverDescription.textContent = 'Emotional sensitivity is elevated. Take deep breaths and refocus on driving.';
+                stateCard.className = 'bg-gradient-to-br from-yellow-500/15 to-yellow-900/10 border border-yellow-500/30 rounded-xl p-6 fade-in-section';
             } else if (isMediumRisk) {
                 driverLabel.textContent = 'WARNING';
                 driverLabel.className = 'text-2xl font-orbitron font-bold text-yellow-400';
@@ -411,7 +617,7 @@ export async function renderDrowsinessPage() {
             setConnectionState(true);
             renderStatus(status);
         } catch {
-            showOfflineState('Cannot reach drowsiness backend. Verify endpoint and start web_server.py.');
+            showOfflineState('Cannot reach drowsiness backend. Verify endpoint and start run_ml_backend.py.');
         } finally {
             requestInFlight = false;
         }
@@ -426,9 +632,23 @@ export async function renderDrowsinessPage() {
         localStorage.setItem(API_STORAGE_KEY, apiBase);
         applyVideoSource();
         void pollStatus();
+
+        if (usingBrowserCamera) {
+            void uploadBrowserFrame();
+        }
     };
 
     connectButton?.addEventListener('click', reconnect);
+    browserCamButton?.addEventListener('click', () => {
+        if (usingBrowserCamera) {
+            stopBrowserCamera();
+            applyVideoSource();
+            void pollStatus();
+            return;
+        }
+
+        void startBrowserCamera();
+    });
     backendInput?.addEventListener('keydown', (event) => {
         if (event.key === 'Enter') {
             event.preventDefault();
@@ -453,6 +673,7 @@ export async function renderDrowsinessPage() {
 
     statusPollInterval = setInterval(() => {
         if (!root || !document.body.contains(root)) {
+            stopBrowserCamera();
             stopPolling();
             return;
         }

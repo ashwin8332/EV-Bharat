@@ -8,6 +8,7 @@ import os
 import sys
 import uvicorn
 from pathlib import Path
+from starlette.middleware.wsgi import WSGIMiddleware
 
 # Add the backend directory to Python path
 backend_dir = Path(__file__).parent
@@ -55,38 +56,60 @@ def run_backend():
     if not setup_ml_backend():
         return
     
-    # Import and run the battery API
+    # Import and run battery + drowsiness APIs
     models_dir = backend_dir / "ML" / "battery_models"
+    drowsiness_dir = backend_dir / "ML" / "drowziness"
     sys.path.insert(0, str(models_dir))
-    
+    sys.path.insert(0, str(drowsiness_dir))
+
     try:
-        # Dynamic import to avoid linting warnings
         import importlib.util
-        spec = importlib.util.spec_from_file_location("battery_api", models_dir / "battery_api.py")
-        battery_api_module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(battery_api_module)
-        
+
+        # Load battery API first; this is required.
+        spec_battery = importlib.util.spec_from_file_location("battery_api", models_dir / "battery_api.py")
+        battery_api_module = importlib.util.module_from_spec(spec_battery)
+        spec_battery.loader.exec_module(battery_api_module)
+
         app = battery_api_module.app
-        
-        print("🚀 Starting Battery ML API Server...")
-        print("📊 ML Models loaded successfully!")
-        print("🌐 API will be available at: http://localhost:8000")
-        print("📖 Interactive docs at: http://localhost:8000/docs")
-        print("🔌 Frontend connection: Auto-detected")
-        
-        # Run the server
+
+        # Load drowsiness Flask app and mount under /drowsiness.
+        spec_drowsiness = importlib.util.spec_from_file_location("web_server", drowsiness_dir / "web_server.py")
+        drowsiness_api_module = importlib.util.module_from_spec(spec_drowsiness)
+        spec_drowsiness.loader.exec_module(drowsiness_api_module)
+
+        camera_started = False
+        try:
+            camera_started = bool(drowsiness_api_module.camera.start())
+        except Exception as camera_error:
+            print("⚠️  Drowsiness camera could not start:")
+            print(f"   {camera_error}")
+            print("   Drowsiness status endpoints are still available.")
+
+        app.mount("/drowsiness", WSGIMiddleware(drowsiness_api_module.app))
+
+        print("🚀 Starting Combined ML API Server...")
+        print("📊 Battery ML models loaded successfully")
+        print("👁️  Drowsiness backend mounted at /drowsiness")
+        print(f"📷 Drowsiness camera: {'running' if camera_started else 'not running'}")
+        if not camera_started:
+            camera_error = getattr(drowsiness_api_module.camera, "camera_error", "Camera unavailable")
+            print(f"   Reason: {camera_error}")
+        print("🌐 API base: http://localhost:8000")
+        print("🧪 Battery health: http://localhost:8000/health")
+        print("🧪 Drowsiness status: http://localhost:8000/drowsiness/status")
+
         uvicorn.run(
             app,
             host="0.0.0.0",
             port=8000,
-            reload=False,  # Disable reload to avoid file watching issues
+            reload=False,
             log_level="info"
         )
-        
+
     except ImportError as e:
-        print("❌ Failed to import battery API:")
+        print("❌ Failed to import one of the backend modules:")
         print(f"   Error: {e}")
-        print("🔧 Make sure the Jupyter notebook has been run completely.")
+        print("🔧 Install missing dependencies from backend requirements files.")
     except Exception as e:
         print(f"❌ Error starting server: {e}")
 

@@ -39,14 +39,10 @@ interface MLModelInfo {
 
 class BatteryMLService {
     private baseUrl: string;
-    private isProduction: boolean;
 
     constructor() {
-        // Auto-detect environment
-        this.isProduction = window.location.hostname !== 'localhost';
-        this.baseUrl = this.isProduction 
-            ? 'http://your-production-domain.com/api'  // Replace with your production URL
-            : 'http://localhost:8000';  // FastAPI default port
+        const configuredBaseUrl = (import.meta.env.VITE_BATTERY_API_URL as string | undefined)?.trim();
+        this.baseUrl = (configuredBaseUrl && configuredBaseUrl.length > 0 ? configuredBaseUrl : '/api/battery').replace(/\/+$/, '');
     }
 
     /**
@@ -72,7 +68,7 @@ class BatteryMLService {
      */
     async getModelInfo(): Promise<MLModelInfo | null> {
         try {
-            const response = await fetch(`${this.baseUrl}/model/info`, {
+            const response = await fetch(`${this.baseUrl}/models/info`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -121,12 +117,12 @@ class BatteryMLService {
      */
     async batchPredict(batteryDataArray: BatteryMLRequest[]): Promise<BatteryMLResponse[]> {
         try {
-            const response = await fetch(`${this.baseUrl}/predict/batch`, {
+            const response = await fetch(`${this.baseUrl}/batch_predict`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ batch_data: batteryDataArray })
+                body: JSON.stringify(batteryDataArray)
             });
 
             if (!response.ok) {
@@ -134,7 +130,7 @@ class BatteryMLService {
             }
 
             const result = await response.json();
-            return result.predictions || [];
+            return result.results || [];
         } catch (error) {
             console.error('Batch prediction failed:', error);
             

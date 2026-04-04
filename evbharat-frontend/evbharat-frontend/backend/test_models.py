@@ -5,6 +5,8 @@ import pickle
 import sys
 from pathlib import Path
 
+from ML.battery_models.battery_intelligence_class import BatteryIntelligence
+
 # Add current directory to path
 current_dir = Path(__file__).parent
 sys.path.append(str(current_dir))

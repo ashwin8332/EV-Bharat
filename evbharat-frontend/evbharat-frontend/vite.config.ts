@@ -45,9 +45,14 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api\/rag/, '')
       },
       '/api/drowsiness': {
-        target: 'http://127.0.0.1:5000',
+        target: 'http://127.0.0.1:8000',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/drowsiness/, '')
+        rewrite: (path) => path.replace(/^\/api\/drowsiness/, '/drowsiness')
+      },
+      '/api/battery': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/battery/, '')
       },
       '/api': {
         target: 'http://127.0.0.1:3001',
