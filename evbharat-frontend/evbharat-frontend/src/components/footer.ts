@@ -37,10 +37,11 @@ export class Footer {
                         <div>
                             <h4 class="text-sm font-orbitron tracking-widest uppercase mb-6 text-pagani-gold">Pages</h4>
                             <ul class="space-y-3">
-                                <li><a href="#" class="text-gray-400 hover:text-white transition-colors text-sm">Dashboard</a></li>
-                                <li><a href="#" class="text-gray-400 hover:text-white transition-colors text-sm">Battery Health</a></li>
-                                <li><a href="#" class="text-gray-400 hover:text-white transition-colors text-sm">Route Planner</a></li>
-                                <li><a href="#" class="text-gray-400 hover:text-white transition-colors text-sm">Alerts</a></li>
+                                <li><a href="/documentation" class="text-gray-400 hover:text-white transition-colors text-sm">Documentation</a></li>
+                                <li><a href="/dashboard" class="text-gray-400 hover:text-white transition-colors text-sm">Dashboard</a></li>
+                                <li><a href="/battery" class="text-gray-400 hover:text-white transition-colors text-sm">Battery Health</a></li>
+                                <li><a href="/map" class="text-gray-400 hover:text-white transition-colors text-sm">Route Planner</a></li>
+                                <li><a href="/alerts" class="text-gray-400 hover:text-white transition-colors text-sm">Alerts</a></li>
                             </ul>
                         </div>
 
@@ -50,7 +51,7 @@ export class Footer {
                             <ul class="space-y-3">
                                 <li><a href="/about" class="text-gray-400 hover:text-white transition-colors text-sm">About Us</a></li>
                                 <li><a href="/gallery" class="text-gray-400 hover:text-white transition-colors text-sm">Gallery</a></li>
-                                <li><a href="#" class="text-gray-400 hover:text-white transition-colors text-sm">Technology</a></li>
+                                <li><a href="/technology" class="text-gray-400 hover:text-white transition-colors text-sm">Technology</a></li>
                                 <li><a href="/contact" class="text-gray-400 hover:text-white transition-colors text-sm">Contact</a></li>
                             </ul>
                         </div>

@@ -6,6 +6,7 @@ import { Loader } from './components/loader';
 import { renderHomePage } from './pages/home';
 import { renderAboutPage } from './pages/about';
 import { renderTechnologyPage } from './pages/technology';
+import { renderDocumentationPage } from './pages/documentation';
 import { renderContactPage } from './pages/contact';
 import { renderGalleryPage } from './pages/gallery';
 import { renderAuthPage } from './pages/auth';
@@ -15,6 +16,7 @@ import { renderBatteryAnalyticsPage } from './pages/battery-analytics';
 import { renderRAGChatPage } from './pages/rag-chat';
 import { renderMapPage } from './pages/map';
 import { renderAlertPage } from './pages/alerts';
+import { renderDrowsinessPage } from './pages/drowsiness';
 import { renderProfilePage } from './pages/profile';
 import { renderFactoryDashboardPage } from './pages/factory-dashboard';
 import { render404Page } from './pages/404';
@@ -31,6 +33,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     router.register('/', 'EVBharat | AI-Powered EV Intelligence', renderHomePage);
     router.register('/about', 'About Us | EVBharat', renderAboutPage);
     router.register('/technology', 'Technology | EVBharat', renderTechnologyPage);
+    router.register('/documentation', 'Documentation | EVBharat', renderDocumentationPage);
     router.register('/contact', 'Contact Us | EVBharat', renderContactPage);
     router.register('/gallery', 'Gallery | EVBharat', renderGalleryPage);
     router.register('/auth', 'Login | EVBharat', renderAuthPage);
@@ -41,6 +44,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     router.register('/rag-chat', 'AI Assistant | EVBharat', renderRAGChatPage);
     router.register('/map', 'Route Planner | EVBharat', renderMapPage);
     router.register('/alerts', 'Alerts | EVBharat', renderAlertPage);
+    router.register('/drowsiness', 'Driver Drowsiness Monitor | EVBharat', renderDrowsinessPage);
     router.register('/profile', 'Profile | EVBharat', renderProfilePage);
     router.register('/404', '404 Not Found | EVBharat', render404Page);
 

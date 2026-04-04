@@ -1,14 +1,239 @@
-import { authService } from '../utils/auth';
+import { authService, type User } from '../utils/auth';
+
+interface NavItem {
+    label: string;
+    path: string;
+    icon: string;
+    description?: string;
+    portal?: 'ev' | 'factory' | 'both';
+    requiresAuth?: boolean;
+}
+
+interface NavGroup {
+    title: string;
+    items: NavItem[];
+    portal?: 'ev' | 'factory' | 'both';
+    requiresAuth?: boolean;
+}
+
+interface LanguageOption {
+    value: string;
+    label: string;
+}
 
 export class Navbar {
     private navbar: HTMLElement | null = null;
+    private navbarShell: HTMLElement | null = null;
     private mobileMenu: HTMLElement | null = null;
     private isMenuOpen: boolean = false;
     private readonly languageStorageKey = 'evbharat_language';
 
+    private readonly languageOptions: ReadonlyArray<LanguageOption> = [
+        { value: 'en', label: 'English' },
+        { value: 'hi', label: 'Hindi' },
+        { value: 'bn', label: 'Bengali' },
+        { value: 'as', label: 'Assamese' },
+        { value: 'or', label: 'Odia' },
+        { value: 'ur', label: 'Urdu' },
+        { value: 'ne', label: 'Nepali' },
+        { value: 'sd', label: 'Sindhi' },
+        { value: 'ta', label: 'Tamil' },
+        { value: 'te', label: 'Telugu' },
+        { value: 'mr', label: 'Marathi' },
+        { value: 'gu', label: 'Gujarati' },
+        { value: 'kn', label: 'Kannada' },
+        { value: 'ml', label: 'Malayalam' },
+        { value: 'pa', label: 'Punjabi' },
+        { value: 'ar', label: 'Arabic' },
+        { value: 'fr', label: 'French' },
+        { value: 'de', label: 'German' },
+        { value: 'es', label: 'Spanish' },
+        { value: 'pt', label: 'Portuguese' },
+        { value: 'ru', label: 'Russian' },
+        { value: 'ja', label: 'Japanese' },
+        { value: 'ko', label: 'Korean' },
+        { value: 'zh-CN', label: 'Chinese (Simplified)' },
+        { value: 'zh-TW', label: 'Chinese (Traditional)' },
+        { value: 'it', label: 'Italian' },
+        { value: 'nl', label: 'Dutch' },
+        { value: 'tr', label: 'Turkish' },
+        { value: 'pl', label: 'Polish' },
+        { value: 'vi', label: 'Vietnamese' },
+        { value: 'id', label: 'Indonesian' },
+        { value: 'th', label: 'Thai' },
+        { value: 'fa', label: 'Persian' },
+        { value: 'uk', label: 'Ukrainian' },
+        { value: 'el', label: 'Greek' },
+        { value: 'sv', label: 'Swedish' },
+        { value: 'da', label: 'Danish' },
+        { value: 'fi', label: 'Finnish' }
+    ];
+
+    // Navigation Configuration
+    private readonly publicNavItems: NavItem[] = [
+        { label: 'Home', path: '/', icon: 'fa-home' },
+        { label: 'About', path: '/about', icon: 'fa-info-circle' },
+        { label: 'Technology', path: '/technology', icon: 'fa-microchip' },
+        { label: 'Gallery', path: '/gallery', icon: 'fa-images' },
+        { label: 'Documentation', path: '/documentation', icon: 'fa-book-open' },
+        { label: 'Contact', path: '/contact', icon: 'fa-envelope' }
+    ];
+
+    private readonly evAuthNavGroups: NavGroup[] = [
+        {
+            title: 'Operations',
+            requiresAuth: true,
+            portal: 'ev',
+            items: [
+                { label: 'Dashboard', path: '/dashboard', icon: 'fa-gauge-high', description: 'Dashboard' },
+                { label: 'Battery', path: '/battery', icon: 'fa-car-battery', description: 'Battery' },
+                { label: 'Routes', path: '/map', icon: 'fa-route', description: 'Routes' }
+            ]
+        },
+        {
+            title: 'Resources',
+            requiresAuth: true,
+            portal: 'ev',
+            items: [
+                { label: 'AI Chat', path: '/rag-chat', icon: 'fa-robot', description: 'AI Chat' },
+                { label: 'Drowsiness', path: '/drowsiness', icon: 'fa-eye', description: 'Driver Alertness' },
+                { label: 'Alerts', path: '/alerts', icon: 'fa-bell', description: 'Alerts' },
+                { label: 'Documentation', path: '/documentation', icon: 'fa-book-open', description: 'Docs' }
+            ]
+        }
+    ];
+
+    private readonly factoryAuthNavGroups: NavGroup[] = [
+        {
+            title: 'Control',
+            requiresAuth: true,
+            portal: 'factory',
+            items: [
+                { label: 'Factory', path: '/factory-dashboard', icon: 'fa-gauge-high', description: 'Factory Control Center' },
+                { label: 'EV Dashboard', path: '/dashboard', icon: 'fa-car-side', description: 'EV Dashboard' },
+                { label: 'AI Ops', path: '/rag-chat', icon: 'fa-robot', description: 'AI Operations' }
+            ]
+        },
+        {
+            title: 'Monitoring',
+            requiresAuth: true,
+            portal: 'factory',
+            items: [
+                { label: 'Incidents', path: '/alerts', icon: 'fa-bell', description: 'Incidents' },
+                { label: 'Drowsiness', path: '/drowsiness', icon: 'fa-eye', description: 'Driver Alertness' },
+                { label: 'Camera Wall', path: '/gallery', icon: 'fa-camera', description: 'Camera Wall' },
+                { label: 'Documentation', path: '/documentation', icon: 'fa-book-open', description: 'Docs' }
+            ]
+        }
+    ];
+
     constructor() {
         this.render();
         this.attachEventListeners();
+    }
+
+    private getLanguageOptionsHTML(): string {
+        return this.languageOptions
+            .map((option) => `<option value="${option.value}">${option.label}</option>`)
+            .join('');
+    }
+
+    private getIncludedLanguagesList(): string {
+        return this.languageOptions.map((option) => option.value).join(',');
+    }
+
+    private getUserDisplayLabel(user: User | null): string {
+        if (user?.email?.trim()) {
+            return user.email.trim();
+        }
+
+        if (user?.name?.trim()) {
+            return user.name.trim();
+        }
+
+        return 'Profile';
+    }
+
+    private getDesktopNavHTML(
+        isAuthenticated: boolean,
+        portalMode: string
+    ): string {
+        if (!isAuthenticated) {
+            return this.publicNavItems
+                .map(
+                    (item) => `
+                <a href="${item.path}" class="nav-link">
+                    <i class="fa-solid ${item.icon} nav-link-icon" aria-hidden="true"></i>
+                    <span>${item.label}</span>
+                </a>
+            `
+                )
+                .join('');
+        }
+
+        const navGroups = portalMode === 'factory' ? this.factoryAuthNavGroups : this.evAuthNavGroups;
+
+        return navGroups
+            .flatMap((group) => group.items)
+            .map(
+                (item) => `
+            <a href="${item.path}" class="nav-link">
+                <i class="fa-solid ${item.icon} nav-link-icon" aria-hidden="true"></i>
+                <span>${item.label}</span>
+            </a>
+        `
+            )
+            .join('');
+    }
+
+    private getMobileNavHTML(
+        isAuthenticated: boolean,
+        portalMode: string
+    ): string {
+        if (!isAuthenticated) {
+            return `
+                <div class="space-y-2 w-full">
+                    ${this.publicNavItems
+                        .map(
+                            (item) => `
+                        <a href="${item.path}" class="mobile-nav-link flex items-center justify-between px-4 py-3 rounded-2xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.06] transition-colors">
+                            <span class="text-sm uppercase tracking-[0.14em]">${item.label}</span>
+                            <i class="fa-solid ${item.icon} text-xs opacity-70"></i>
+                        </a>
+                    `
+                        )
+                        .join('')}
+                </div>
+            `;
+        }
+
+        const navGroups = portalMode === 'factory' ? this.factoryAuthNavGroups : this.evAuthNavGroups;
+
+        return `
+            <div class="w-full">
+                ${navGroups
+                    .map(
+                        (group) => `
+                    <div class="mb-6">
+                        <h3 class="text-[11px] uppercase tracking-[0.24em] mb-3 text-white/60">${group.title}</h3>
+                        <div class="grid grid-cols-2 gap-3">
+                            ${group.items
+                                .map(
+                                    (item) => `
+                                <a href="${item.path}" class="mobile-nav-card flex flex-col items-center justify-center gap-2 p-4 border border-white/10 rounded-2xl bg-white/[0.02] hover:bg-white/[0.08] transition-all duration-200 min-h-[96px]">
+                                    <i class="fa-solid ${item.icon} text-2xl"></i>
+                                    <span class="text-[11px] uppercase tracking-[0.12em] text-center">${item.label}</span>
+                                </a>
+                            `
+                                )
+                                .join('')}
+                        </div>
+                    </div>
+                `
+                    )
+                    .join('')}
+            </div>
+        `;
     }
 
     private render() {
@@ -16,351 +241,282 @@ export class Navbar {
         const user = authService.getCurrentUser();
         const portalMode = localStorage.getItem('evbharat_portal_mode') || 'ev';
         const isFactoryMode = portalMode === 'factory';
-        const dashboardPath = portalMode === 'factory' ? '/factory-dashboard' : '/dashboard';
+        const userLabel = this.getUserDisplayLabel(user);
+        const languageOptionsHTML = this.getLanguageOptionsHTML();
+        
+        const desktopNavHTML = this.getDesktopNavHTML(isAuthenticated, portalMode);
+        const mobileNavHTML = this.getMobileNavHTML(isAuthenticated, portalMode);
         
         const navbarHTML = `
-            ${isFactoryMode ? `
-            <style id="factory-navbar-theme">
-                .factory-mode .text-pagani-gold { color: #67e8f9 !important; }
-                .factory-mode .hover\\:text-pagani-gold:hover { color: #67e8f9 !important; }
-                .factory-mode .border-pagani-gold\\/10,
-                .factory-mode .border-pagani-gold\\/20,
-                .factory-mode .border-pagani-gold\\/30,
-                .factory-mode .border-pagani-gold\\/50,
-                .factory-mode .hover\\:border-pagani-gold:hover { border-color: rgba(34, 211, 238, 0.45) !important; }
-                .factory-mode .bg-pagani-gold\\/10 { background-color: rgba(34, 211, 238, 0.10) !important; }
-                .factory-mode .bg-pagani-gold\\/20 { background-color: rgba(34, 211, 238, 0.16) !important; }
-                .factory-mode .hover\\:bg-pagani-gold\\/10:hover { background-color: rgba(34, 211, 238, 0.16) !important; }
-                .factory-mode .bg-pagani-gold { background-color: #22d3ee !important; }
-                .factory-mode .hover\\:bg-pagani-gold:hover { background-color: #22d3ee !important; }
-                .factory-mode .hover\\:text-black:hover { color: #020617 !important; }
-            </style>
-            ` : ''}
-            <style id="language-selector-theme">
-                .language-select {
-                    width: 11rem;
+            <style id="navbar-design-theme">
+                #navbar {
+                    --nav-accent: #d4af37;
+                    --nav-accent-soft: rgba(212, 175, 55, 0.19);
+                    --nav-accent-border: rgba(212, 175, 55, 0.48);
+                }
+
+                #navbar.factory-mode {
+                    --nav-accent: #22d3ee;
+                    --nav-accent-soft: rgba(34, 211, 238, 0.2);
+                    --nav-accent-border: rgba(34, 211, 238, 0.5);
+                }
+
+                #navbar .nav-pill-shell {
+                    border-radius: 9999px;
+                    border: 1px solid rgba(255, 255, 255, 0.14);
+                    background:
+                        linear-gradient(95deg, rgba(9, 12, 19, 0.95), rgba(11, 17, 33, 0.95) 42%, rgba(8, 11, 18, 0.95)),
+                        radial-gradient(circle at 22% 50%, rgba(212, 175, 55, 0.18), transparent 42%);
+                    box-shadow: 0 20px 44px rgba(2, 6, 23, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.09);
+                    transition: transform 220ms ease, box-shadow 220ms ease;
+                }
+
+                #navbar.navbar-scrolled .nav-pill-shell {
+                    transform: translateY(-1px);
+                    box-shadow: 0 26px 58px rgba(2, 6, 23, 0.62), inset 0 1px 0 rgba(255, 255, 255, 0.13);
+                }
+
+                #navbar .nav-brand-wordmark {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0;
+                    border-radius: 0.72rem;
+                    border: 1px solid rgba(212, 175, 55, 0.3);
+                    background: rgba(9, 13, 20, 0.92);
                     color: #f8fafc;
-                    background-color: rgba(2, 6, 23, 0.25);
-                    border: 1px solid rgba(234, 179, 8, 0.35);
-                    border-radius: 0.5rem;
-                    padding: 0.35rem 2rem 0.35rem 0.75rem;
-                    font-size: 0.875rem;
-                    line-height: 1.25rem;
+                    padding: 0.42rem 0.6rem 0.4rem 0.6rem;
+                    font-family: 'Orbitron', sans-serif;
+                    font-size: 1.6rem;
+                    font-weight: 800;
+                    letter-spacing: 0.06em;
+                    line-height: 1;
+                    box-shadow: 0 10px 22px rgba(3, 7, 18, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+                    transition: transform 180ms ease, box-shadow 180ms ease;
+                }
+
+                #navbar .nav-brand-wordmark:hover {
+                    transform: translateY(-1px);
+                    box-shadow: 0 14px 24px rgba(3, 7, 18, 0.44), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+                }
+
+                #navbar .brand-ev {
+                    color: #f8fafc;
+                }
+
+                #navbar .brand-bharat {
+                    color: #d4af37;
+                }
+
+                #navbar .nav-main-links {
+                    scrollbar-width: none;
+                    -ms-overflow-style: none;
+                    overflow-x: auto;
+                    overflow-y: hidden;
+                    white-space: nowrap;
+                }
+
+                #navbar .nav-main-links::-webkit-scrollbar {
+                    display: none;
+                }
+
+                #navbar .nav-link {
+                    color: rgba(226, 232, 240, 0.92);
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.46rem;
+                    padding: 0.5rem 0.72rem;
+                    border-radius: 9999px;
+                    font-family: 'Rajdhani', sans-serif;
+                    font-size: 0.86rem;
+                    font-weight: 700;
+                    letter-spacing: 0.08em;
+                    text-transform: uppercase;
+                    white-space: nowrap;
+                    border: 1px solid transparent;
+                    transition: color 180ms ease, background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+                }
+
+                #navbar .nav-link-icon {
+                    font-size: 0.68rem;
+                    opacity: 0.76;
+                }
+
+                #navbar .nav-link:hover {
+                    color: #ffffff;
+                    background: rgba(255, 255, 255, 0.08);
+                    border-color: rgba(255, 255, 255, 0.12);
+                }
+
+                #navbar .nav-link.nav-link-active {
+                    color: #ffffff;
+                    background: linear-gradient(130deg, var(--nav-accent-soft), rgba(255, 255, 255, 0.06));
+                    border-color: var(--nav-accent-border);
+                    box-shadow: 0 6px 16px rgba(1, 4, 12, 0.35);
+                }
+
+                #navbar .nav-link.nav-link-active .nav-link-icon {
+                    color: var(--nav-accent);
+                    opacity: 1;
+                }
+
+                #navbar .nav-cta {
+                    border-radius: 9999px;
+                    background: #f8fafc;
+                    color: #111827;
+                    padding: 0.58rem 1rem;
+                    font-size: 0.82rem;
+                    font-weight: 700;
+                    letter-spacing: 0.02em;
+                    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.26);
+                    transition: transform 180ms ease, box-shadow 180ms ease;
+                    max-width: 14rem;
+                    display: inline-flex;
+                    align-items: center;
+                }
+
+                #navbar .nav-cta:hover {
+                    transform: translateY(-1px);
+                    box-shadow: 0 12px 22px rgba(15, 23, 42, 0.3);
+                }
+
+                #navbar .nav-ghost-btn {
+                    border-radius: 9999px;
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    color: rgba(226, 232, 240, 0.92);
+                    width: 2.25rem;
+                    height: 2.25rem;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: background-color 180ms ease, border-color 180ms ease;
+                }
+
+                #navbar .nav-ghost-btn:hover {
+                    background: rgba(255, 255, 255, 0.1);
+                    border-color: rgba(255, 255, 255, 0.45);
+                }
+
+                #navbar .language-select {
+                    width: 7.6rem;
+                    border-radius: 9999px;
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    background: rgba(255, 255, 255, 0.05);
+                    color: #f1f5f9;
+                    padding: 0.38rem 1.75rem 0.38rem 0.72rem;
+                    font-size: 0.73rem;
+                    letter-spacing: 0.02em;
                     appearance: none;
                     -webkit-appearance: none;
                     -moz-appearance: none;
-                    background-image: linear-gradient(45deg, transparent 50%, #eab308 50%), linear-gradient(135deg, #eab308 50%, transparent 50%);
-                    background-position: calc(100% - 16px) calc(50% - 2px), calc(100% - 11px) calc(50% - 2px);
+                    background-image: linear-gradient(45deg, transparent 50%, var(--nav-accent) 50%), linear-gradient(135deg, var(--nav-accent) 50%, transparent 50%);
+                    background-position: calc(100% - 14px) calc(50% - 2px), calc(100% - 9px) calc(50% - 2px);
                     background-size: 5px 5px, 5px 5px;
                     background-repeat: no-repeat;
-                    transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+                    transition: border-color 180ms ease, background-color 180ms ease;
                 }
 
-                .language-select:hover {
-                    border-color: rgba(234, 179, 8, 0.7);
-                    background-color: rgba(2, 6, 23, 0.4);
-                }
-
-                .language-select:focus {
+                #navbar .language-select:hover,
+                #navbar .language-select:focus {
+                    border-color: var(--nav-accent-border);
+                    background-color: rgba(255, 255, 255, 0.1);
                     outline: none;
-                    border-color: rgba(234, 179, 8, 0.9);
-                    box-shadow: 0 0 0 2px rgba(234, 179, 8, 0.2);
                 }
 
-                .language-select option {
-                    color: #f8fafc;
-                    background-color: #0b1220;
+                #navbar .language-select option {
+                    color: #111827;
+                    background-color: #f8fafc;
                 }
 
-                .mobile-language-select {
-                    width: 100%;
-                    max-width: 13rem;
+                #navbar .mobile-nav-link-active {
+                    border-color: var(--nav-accent-border) !important;
+                    background: var(--nav-accent-soft) !important;
                 }
 
-                .factory-mode .language-select {
-                    border-color: rgba(34, 211, 238, 0.45);
-                    background-image: linear-gradient(45deg, transparent 50%, #22d3ee 50%), linear-gradient(135deg, #22d3ee 50%, transparent 50%);
+                #navbar .mobile-nav-card-active {
+                    border-color: var(--nav-accent-border) !important;
+                    background: var(--nav-accent-soft) !important;
                 }
 
-                .factory-mode .language-select:hover,
-                .factory-mode .language-select:focus {
-                    border-color: rgba(34, 211, 238, 0.8);
-                    box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.2);
+                @media (max-width: 1279px) {
+                    #navbar .nav-pill-shell {
+                        border-radius: 1.1rem;
+                    }
                 }
             </style>
-            <nav class="fixed top-0 left-0 w-full z-50 px-4 md:px-8 py-3 md:py-4 transition-all duration-300 ${isFactoryMode ? 'factory-mode' : ''}" id="navbar">
-                <div class="max-w-7xl mx-auto">
-                    <div class="flex items-center justify-between">
-                        <!-- Logo -->
-                        <div class="flex-shrink-0 z-10">
-                            <a href="/" class="text-lg md:text-xl lg:text-2xl font-bold tracking-widest text-white uppercase font-orbitron hover:text-pagani-gold transition-colors">
-                                EV<span class="text-pagani-gold">BHARAT</span>
-                            </a>
+            <nav class="fixed top-3 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-1rem)] max-w-[96rem] transition-all duration-300 ${isFactoryMode ? 'factory-mode' : ''}" id="navbar">
+                <div id="navbar-shell" class="nav-pill-shell px-2.5 md:px-3 py-2">
+                    <div class="flex items-center gap-2.5 w-full">
+                        <a href="/" class="nav-brand-wordmark" aria-label="EV Bharat home">
+                            <span class="brand-ev">EV</span><span class="brand-bharat">BHARAT</span>
+                        </a>
+
+                        <div class="hidden lg:flex items-center gap-1.5 flex-1 min-w-0 nav-main-links pr-1">
+                            ${desktopNavHTML}
                         </div>
 
-                        <!-- Desktop Navigation -->
-                        <div class="hidden lg:flex items-center justify-center flex-1 max-w-4xl mx-8">
-                            ${!isAuthenticated ? `
-                            <div class="flex items-center gap-4 xl:gap-6">
-                                <a href="/" class="nav-link text-sm tracking-wider uppercase hover:text-pagani-gold transition-all duration-300 py-2 px-3 rounded-md hover:bg-pagani-gold/10">Home</a>
-                                <a href="/about" class="nav-link text-sm tracking-wider uppercase hover:text-pagani-gold transition-all duration-300 py-2 px-3 rounded-md hover:bg-pagani-gold/10">About</a>
-                                <a href="/technology" class="nav-link text-sm tracking-wider uppercase hover:text-pagani-gold transition-all duration-300 py-2 px-3 rounded-md hover:bg-pagani-gold/10">Technology</a>
-                                <a href="/gallery" class="nav-link text-sm tracking-wider uppercase hover:text-pagani-gold transition-all duration-300 py-2 px-3 rounded-md hover:bg-pagani-gold/10">Gallery</a>
-                                <a href="/contact" class="nav-link text-sm tracking-wider uppercase hover:text-pagani-gold transition-all duration-300 py-2 px-3 rounded-md hover:bg-pagani-gold/10">Contact</a>
-                            </div>
-                            ` : `
-                            <div class="flex items-center gap-3 xl:gap-4">
-                                <a href="${dashboardPath}" class="nav-link text-xs xl:text-sm tracking-wider uppercase hover:text-pagani-gold transition-all duration-300 flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-pagani-gold/10 border border-transparent hover:border-pagani-gold/30">
-                                    <i class="fa-solid fa-gauge-high text-xs"></i>
-                                    <span class="hidden xl:inline">${portalMode === 'factory' ? 'Factory' : 'Dashboard'}</span>
-                                </a>
-                                ${portalMode === 'factory' ? `
-                                <a href="/dashboard" class="nav-link text-xs xl:text-sm tracking-wider uppercase hover:text-pagani-gold transition-all duration-300 flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-pagani-gold/10 border border-transparent hover:border-pagani-gold/30">
-                                    <i class="fa-solid fa-car-side text-xs"></i>
-                                    <span class="hidden xl:inline">EV Dashboard</span>
-                                </a>
-                                <a href="/alerts" class="nav-link text-xs xl:text-sm tracking-wider uppercase hover:text-pagani-gold transition-all duration-300 flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-pagani-gold/10 border border-transparent hover:border-pagani-gold/30">
-                                    <i class="fa-solid fa-bell text-xs"></i>
-                                    <span class="hidden xl:inline">Incidents</span>
-                                </a>
-                                <a href="/rag-chat" class="nav-link text-xs xl:text-sm tracking-wider uppercase hover:text-pagani-gold transition-all duration-300 flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-pagani-gold/10 border border-transparent hover:border-pagani-gold/30">
-                                    <i class="fa-solid fa-robot text-xs"></i>
-                                    <span class="hidden xl:inline">AI Ops</span>
-                                </a>
-                                <a href="/gallery" class="nav-link text-xs xl:text-sm tracking-wider uppercase hover:text-pagani-gold transition-all duration-300 flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-pagani-gold/10 border border-transparent hover:border-pagani-gold/30">
-                                    <i class="fa-solid fa-camera text-xs"></i>
-                                    <span class="hidden xl:inline">Camera Wall</span>
-                                </a>
-                                <a href="/profile" class="nav-link text-xs xl:text-sm tracking-wider uppercase hover:text-pagani-gold transition-all duration-300 flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-pagani-gold/10 border border-transparent hover:border-pagani-gold/30">
-                                    <i class="fa-solid fa-user text-xs"></i>
-                                    <span class="hidden xl:inline">Operator</span>
-                                </a>
-                                ` : `
-                                <a href="/battery" class="nav-link text-xs xl:text-sm tracking-wider uppercase hover:text-pagani-gold transition-all duration-300 flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-pagani-gold/10 border border-transparent hover:border-pagani-gold/30">
-                                    <i class="fa-solid fa-car-battery text-xs"></i>
-                                    <span class="hidden xl:inline">Battery</span>
-                                </a>
-                                <a href="/rag-chat" class="nav-link text-xs xl:text-sm tracking-wider uppercase hover:text-pagani-gold transition-all duration-300 flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-pagani-gold/10 border border-transparent hover:border-pagani-gold/30">
-                                    <i class="fa-solid fa-robot text-xs"></i>
-                                    <span class="hidden xl:inline">AI Chat</span>
-                                </a>
-                                <a href="/map" class="nav-link text-xs xl:text-sm tracking-wider uppercase hover:text-pagani-gold transition-all duration-300 flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-pagani-gold/10 border border-transparent hover:border-pagani-gold/30">
-                                    <i class="fa-solid fa-route text-xs"></i>
-                                    <span class="hidden xl:inline">Routes</span>
-                                </a>
-                                <a href="/alerts" class="nav-link text-xs xl:text-sm tracking-wider uppercase hover:text-pagani-gold transition-all duration-300 flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-pagani-gold/10 border border-transparent hover:border-pagani-gold/30">
-                                    <i class="fa-solid fa-bell text-xs"></i>
-                                    <span class="hidden xl:inline">Alerts</span>
-                                </a>
-                                `}
-                            </div>
-                            `}
-                        </div>
-
-                        <!-- User Menu (Desktop) - Right Aligned -->
-                        <div class="hidden md:flex items-center gap-3 lg:gap-4 flex-shrink-0 z-10">
-                            <label class="flex items-center gap-2 px-3 py-2 border border-pagani-gold/30 rounded-lg bg-pagani-black/30 hover:border-pagani-gold/60 transition-colors" aria-label="Select language">
-                                <i class="fa-solid fa-language text-pagani-gold text-sm"></i>
+                        <div class="hidden xl:flex items-center gap-2 shrink-0">
+                            <label class="inline-flex items-center" aria-label="Select language">
                                 <select id="language-select" class="language-select" title="Select language">
-                                    <option value="en">English</option>
-                                    <option value="hi">Hindi</option>
-                                    <option value="bn">Bengali</option>
-                                    <option value="as">Assamese</option>
-                                    <option value="or">Odia</option>
-                                    <option value="ur">Urdu</option>
-                                    <option value="ne">Nepali</option>
-                                    <option value="sd">Sindhi</option>
-                                    <option value="ta">Tamil</option>
-                                    <option value="te">Telugu</option>
-                                    <option value="mr">Marathi</option>
-                                    <option value="gu">Gujarati</option>
-                                    <option value="kn">Kannada</option>
-                                    <option value="ml">Malayalam</option>
-                                    <option value="pa">Punjabi</option>
-                                    <option value="ar">Arabic</option>
-                                    <option value="fr">French</option>
-                                    <option value="de">German</option>
-                                    <option value="es">Spanish</option>
-                                    <option value="pt">Portuguese</option>
-                                    <option value="ru">Russian</option>
-                                    <option value="ja">Japanese</option>
-                                    <option value="ko">Korean</option>
-                                    <option value="zh-CN">Chinese (Simplified)</option>
-                                    <option value="zh-TW">Chinese (Traditional)</option>
-                                    <option value="it">Italian</option>
-                                    <option value="nl">Dutch</option>
-                                    <option value="tr">Turkish</option>
-                                    <option value="pl">Polish</option>
-                                    <option value="vi">Vietnamese</option>
-                                    <option value="id">Indonesian</option>
-                                    <option value="th">Thai</option>
-                                    <option value="fa">Persian</option>
-                                    <option value="uk">Ukrainian</option>
-                                    <option value="el">Greek</option>
-                                    <option value="sv">Swedish</option>
-                                    <option value="da">Danish</option>
-                                    <option value="fi">Finnish</option>
+                                    ${languageOptionsHTML}
                                 </select>
                             </label>
+
                             ${isAuthenticated ? `
-                            <a href="/profile" class="flex items-center gap-2 lg:gap-3 px-3 lg:px-4 py-2 border border-pagani-gold/30 rounded-lg bg-pagani-black/20 backdrop-blur-sm hover:border-pagani-gold hover:bg-pagani-gold/10 transition-all duration-300 group">
-                                <div class="text-right hidden md:block">
-                                    <p class="text-xs text-gray-400 uppercase tracking-wider group-hover:text-pagani-gold/80 transition-colors">User</p>
-                                    <p class="text-sm font-orbitron font-bold text-pagani-gold">${user?.name}</p>
-                                </div>
-                                <div class="w-8 h-8 rounded-full bg-pagani-gold/20 flex items-center justify-center text-pagani-gold border border-pagani-gold/30 group-hover:bg-pagani-gold/30 group-hover:border-pagani-gold transition-all duration-300">
-                                    <i class="fa-solid fa-user text-sm"></i>
-                                </div>
+                            <a href="/profile" class="nav-cta" title="${userLabel}">
+                                <span class="truncate">${userLabel}</span>
                             </a>
-                            <button id="logout-btn" class="px-4 lg:px-6 py-2 bg-pagani-gold/20 border border-pagani-gold/50 text-xs tracking-[0.2em] hover:bg-pagani-gold hover:text-black transition-all uppercase rounded-lg">
-                                <span class="hidden lg:inline">Logout</span>
-                                <i class="fa-solid fa-sign-out-alt lg:hidden"></i>
+                            <button id="logout-btn" class="nav-ghost-btn" aria-label="Logout">
+                                <i class="fa-solid fa-right-from-bracket text-xs"></i>
                             </button>
                             ` : `
-                            <a href="/auth" class="px-4 lg:px-6 py-2 border border-pagani-gold/30 text-xs tracking-[0.2em] hover:text-pagani-gold hover:border-pagani-gold transition-all uppercase rounded-lg">
-                                Login
+                            <a href="/auth" class="nav-cta">
+                                <span>Login</span>
                             </a>
                             `}
                         </div>
 
-                        <!-- Mobile Menu Button -->
-                        <button id="mobile-menu-btn" class="lg:hidden text-white focus:outline-none p-2 hover:bg-pagani-gold/10 rounded-lg transition-colors ml-auto md:ml-4">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <button id="mobile-menu-btn" class="xl:hidden inline-flex items-center justify-center text-white w-10 h-10 rounded-full border border-white/20 bg-white/[0.04] hover:bg-white/[0.12] transition-colors" aria-label="Toggle menu">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path class="menu-icon" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
                                 <path class="close-icon hidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                             </svg>
                         </button>
                     </div>
+                </div>
 
-                <!-- Mobile Menu -->
-                <div id="mobile-menu" class="lg:hidden fixed inset-0 bg-pagani-black/98 backdrop-blur-xl transform translate-x-full transition-transform duration-300 pt-16 z-40">
-                    <div class="flex flex-col items-center gap-6 p-4 h-full overflow-y-auto">
-                        ${!isAuthenticated ? `
-                        <div class="flex flex-col items-center gap-6 w-full">
-                            <a href="/" class="mobile-nav-link text-xl tracking-wider uppercase hover:text-pagani-gold transition-colors py-2">Home</a>
-                            <a href="/about" class="mobile-nav-link text-xl tracking-wider uppercase hover:text-pagani-gold transition-colors py-2">About</a>
-                            <a href="/technology" class="mobile-nav-link text-xl tracking-wider uppercase hover:text-pagani-gold transition-colors py-2">Technology</a>
-                            <a href="/gallery" class="mobile-nav-link text-xl tracking-wider uppercase hover:text-pagani-gold transition-colors py-2">Gallery</a>
-                            <a href="/contact" class="mobile-nav-link text-xl tracking-wider uppercase hover:text-pagani-gold transition-colors py-2">Contact</a>
-                        </div>
-                        ` : ''}
-                        ${isAuthenticated ? `
-                        <div class="w-full">
-                            <div class="text-center mb-6">
-                                <h2 class="text-pagani-gold font-orbitron text-lg uppercase tracking-wider">${portalMode === 'factory' ? 'Factory Control Center' : 'EV Control Center'}</h2>
-                                <div class="w-16 h-0.5 bg-pagani-gold mx-auto mt-2"></div>
+                <div id="mobile-menu" class="xl:hidden fixed inset-0 z-40 bg-[#0a0d14]/95 backdrop-blur-xl transform translate-x-full transition-transform duration-300 overflow-y-auto">
+                    <div class="mx-auto w-full max-w-md pt-24 px-4 pb-10">
+                        <div class="rounded-[2rem] border border-white/10 bg-[#121827]/90 shadow-[0_22px_42px_rgba(0,0,0,0.45)] p-5">
+                            <div class="mb-5">
+                                <a href="/" class="nav-brand-wordmark" aria-label="EV Bharat home">
+                                    <span class="brand-ev">EV</span><span class="brand-bharat">BHARAT</span>
+                                </a>
                             </div>
-                            <div class="grid grid-cols-2 gap-4 mb-6">
-                                <a href="${dashboardPath}" class="mobile-nav-card flex flex-col items-center justify-center gap-3 p-6 border border-pagani-gold/30 rounded-xl hover:bg-pagani-gold/10 hover:border-pagani-gold transition-all duration-300 min-h-[100px]">
-                                    <i class="fa-solid fa-gauge-high text-3xl text-pagani-gold"></i>
-                                    <span class="text-xs uppercase tracking-wider text-center">${portalMode === 'factory' ? 'Factory' : 'Dashboard'}</span>
+
+                            ${mobileNavHTML}
+
+                            <div class="mt-7 pt-6 border-t border-white/10 space-y-3">
+                                <label class="flex items-center justify-between gap-3" aria-label="Select language">
+                                    <span class="text-[11px] uppercase tracking-[0.2em] text-white/65">Language</span>
+                                    <select id="mobile-language-select" class="language-select !w-40" title="Select language">
+                                        ${languageOptionsHTML}
+                                    </select>
+                                </label>
+
+                                ${isAuthenticated ? `
+                                <a href="/profile" class="mobile-nav-link flex items-center justify-between px-4 py-3 rounded-2xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.08] transition-colors">
+                                    <span class="text-[11px] uppercase tracking-[0.2em] text-white/60">Profile</span>
+                                    <span class="font-semibold text-sm truncate max-w-[10rem]">${userLabel}</span>
                                 </a>
-                                ${portalMode === 'factory' ? `
-                                <a href="/alerts" class="mobile-nav-card flex flex-col items-center justify-center gap-3 p-6 border border-pagani-gold/30 rounded-xl hover:bg-pagani-gold/10 hover:border-pagani-gold transition-all duration-300 min-h-[100px]">
-                                    <i class="fa-solid fa-bell text-3xl text-pagani-gold"></i>
-                                    <span class="text-xs uppercase tracking-wider text-center">Incidents</span>
-                                </a>
-                                ` : `
-                                <a href="/battery" class="mobile-nav-card flex flex-col items-center justify-center gap-3 p-6 border border-pagani-gold/30 rounded-xl hover:bg-pagani-gold/10 hover:border-pagani-gold transition-all duration-300 min-h-[100px]">
-                                    <i class="fa-solid fa-car-battery text-3xl text-pagani-gold"></i>
-                                    <span class="text-xs uppercase tracking-wider text-center">Battery</span>
-                                </a>
-                                `}
-                                <a href="/rag-chat" class="mobile-nav-card flex flex-col items-center justify-center gap-3 p-6 border border-pagani-gold/30 rounded-xl hover:bg-pagani-gold/10 hover:border-pagani-gold transition-all duration-300 min-h-[100px]">
-                                    <i class="fa-solid fa-robot text-3xl text-pagani-gold"></i>
-                                    <span class="text-xs uppercase tracking-wider text-center">${portalMode === 'factory' ? 'AI Ops' : 'AI Chat'}</span>
-                                </a>
-                                ${portalMode === 'factory' ? `
-                                <a href="/dashboard" class="mobile-nav-card flex flex-col items-center justify-center gap-3 p-6 border border-pagani-gold/30 rounded-xl hover:bg-pagani-gold/10 hover:border-pagani-gold transition-all duration-300 min-h-[100px]">
-                                    <i class="fa-solid fa-car-side text-3xl text-pagani-gold"></i>
-                                    <span class="text-xs uppercase tracking-wider text-center">EV Dashboard</span>
-                                </a>
-                                ` : ''}
-                                ${portalMode === 'factory' ? `
-                                <a href="/gallery" class="mobile-nav-card flex flex-col items-center justify-center gap-3 p-6 border border-pagani-gold/30 rounded-xl hover:bg-pagani-gold/10 hover:border-pagani-gold transition-all duration-300 min-h-[100px]">
-                                    <i class="fa-solid fa-camera text-3xl text-pagani-gold"></i>
-                                    <span class="text-xs uppercase tracking-wider text-center">Camera Wall</span>
-                                </a>
-                                ` : `
-                                <a href="/map" class="mobile-nav-card flex flex-col items-center justify-center gap-3 p-6 border border-pagani-gold/30 rounded-xl hover:bg-pagani-gold/10 hover:border-pagani-gold transition-all duration-300 min-h-[100px]">
-                                    <i class="fa-solid fa-route text-3xl text-pagani-gold"></i>
-                                    <span class="text-xs uppercase tracking-wider text-center">Routes</span>
-                                </a>
-                                `}
-                            </div>
-                            ${portalMode === 'factory' ? `
-                            <a href="/profile" class="mobile-nav-card w-full flex items-center justify-center gap-4 p-4 border border-pagani-gold/30 rounded-xl hover:bg-pagani-gold/10 hover:border-pagani-gold transition-all duration-300">
-                                <i class="fa-solid fa-user text-2xl text-pagani-gold"></i>
-                                <span class="text-sm uppercase tracking-wider">Operator Settings</span>
-                            </a>
-                            ` : `
-                            <a href="/alerts" class="mobile-nav-card w-full flex items-center justify-center gap-4 p-4 border border-pagani-gold/30 rounded-xl hover:bg-pagani-gold/10 hover:border-pagani-gold transition-all duration-300">
-                                <i class="fa-solid fa-bell text-2xl text-pagani-gold"></i>
-                                <span class="text-sm uppercase tracking-wider">Smart Alerts & Notifications</span>
-                            </a>
-                            `}
-                        </div>
-                        ` : ''}
-                        <div class="flex flex-col gap-4 w-full mt-8">
-                            <label class="w-full flex items-center justify-between gap-3 px-4 py-3 border border-pagani-gold/30 rounded-lg bg-pagani-black/20" aria-label="Select language">
-                                <span class="text-xs uppercase tracking-[0.2em] text-pagani-gold">Language</span>
-                                <select id="mobile-language-select" class="language-select mobile-language-select" title="Select language">
-                                    <option value="en">English</option>
-                                    <option value="hi">Hindi</option>
-                                    <option value="bn">Bengali</option>
-                                    <option value="as">Assamese</option>
-                                    <option value="or">Odia</option>
-                                    <option value="ur">Urdu</option>
-                                    <option value="ne">Nepali</option>
-                                    <option value="sd">Sindhi</option>
-                                    <option value="ta">Tamil</option>
-                                    <option value="te">Telugu</option>
-                                    <option value="mr">Marathi</option>
-                                    <option value="gu">Gujarati</option>
-                                    <option value="kn">Kannada</option>
-                                    <option value="ml">Malayalam</option>
-                                    <option value="pa">Punjabi</option>
-                                    <option value="ar">Arabic</option>
-                                    <option value="fr">French</option>
-                                    <option value="de">German</option>
-                                    <option value="es">Spanish</option>
-                                    <option value="pt">Portuguese</option>
-                                    <option value="ru">Russian</option>
-                                    <option value="ja">Japanese</option>
-                                    <option value="ko">Korean</option>
-                                    <option value="zh-CN">Chinese (Simplified)</option>
-                                    <option value="zh-TW">Chinese (Traditional)</option>
-                                    <option value="it">Italian</option>
-                                    <option value="nl">Dutch</option>
-                                    <option value="tr">Turkish</option>
-                                    <option value="pl">Polish</option>
-                                    <option value="vi">Vietnamese</option>
-                                    <option value="id">Indonesian</option>
-                                    <option value="th">Thai</option>
-                                    <option value="fa">Persian</option>
-                                    <option value="uk">Ukrainian</option>
-                                    <option value="el">Greek</option>
-                                    <option value="sv">Swedish</option>
-                                    <option value="da">Danish</option>
-                                    <option value="fi">Finnish</option>
-                                </select>
-                            </label>
-                            ${isAuthenticated ? `
-                                <a href="/profile" class="text-center py-3 border border-pagani-gold/30 rounded-lg hover:border-pagani-gold hover:bg-pagani-gold/10 transition-all duration-300 mobile-nav-link">
-                                    <p class="text-xs text-gray-400 uppercase tracking-wider">Profile Settings</p>
-                                    <p class="font-orbitron font-bold text-pagani-gold">${user?.name}</p>
-                                </a>
-                                <button id="logout-mobile-btn" class="w-full px-8 py-3 bg-pagani-gold/20 border border-pagani-gold/50 text-sm tracking-[0.2em] hover:bg-pagani-gold hover:text-black transition-all uppercase">
+                                <button id="logout-mobile-btn" class="w-full py-3 rounded-2xl border border-white/20 bg-white/[0.05] hover:bg-white/[0.12] text-sm uppercase tracking-[0.18em] transition-colors">
                                     Logout
                                 </button>
-                            ` : `
-                                <a href="/auth" class="w-full text-center py-3 border border-pagani-gold/30 text-sm tracking-[0.2em] hover:text-pagani-gold hover:border-pagani-gold transition-all uppercase">
+                                ` : `
+                                <a href="/auth" class="mobile-nav-link block text-center px-6 py-3 rounded-2xl border border-white/20 bg-white/[0.05] hover:bg-white/[0.12] text-sm uppercase tracking-[0.18em] transition-colors">
                                     Login
                                 </a>
-                                <button class="w-full px-8 py-3 border border-pagani-gold text-sm tracking-[0.2em] hover:bg-pagani-gold hover:text-black transition-all uppercase">
-                                    Book Test Drive
-                                </button>
-                            `}
+                                `}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -370,6 +526,7 @@ export class Navbar {
         // Insert navbar at the beginning of body
         document.body.insertAdjacentHTML('afterbegin', navbarHTML);
         this.navbar = document.getElementById('navbar');
+        this.navbarShell = document.getElementById('navbar-shell');
         this.mobileMenu = document.getElementById('mobile-menu');
         this.initializeGoogleTranslate();
     }
@@ -446,7 +603,7 @@ export class Navbar {
             new win.google.translate.TranslateElement(
                 {
                     pageLanguage: 'en',
-                    includedLanguages: 'en,hi,bn,as,or,ur,ne,sd,ta,te,mr,gu,kn,ml,pa,ar,fr,de,es,pt,ru,ja,ko,zh-CN,zh-TW,it,nl,tr,pl,vi,id,th,fa,uk,el,sv,da,fi',
+                    includedLanguages: this.getIncludedLanguagesList(),
                     autoDisplay: false,
                 },
                 containerId
@@ -516,13 +673,13 @@ export class Navbar {
     }
 
     private handleScroll() {
-        if (!this.navbar) return;
+        if (!this.navbar || !this.navbarShell) return;
 
         const scrolled = window.scrollY;
-        if (scrolled > 50) {
-            this.navbar.classList.add('bg-pagani-black/80', 'backdrop-blur-md', 'shadow-lg');
+        if (scrolled > 28) {
+            this.navbar.classList.add('navbar-scrolled');
         } else {
-            this.navbar.classList.remove('bg-pagani-black/80', 'backdrop-blur-md', 'shadow-lg');
+            this.navbar.classList.remove('navbar-scrolled');
         }
     }
 
@@ -533,15 +690,19 @@ export class Navbar {
         links.forEach(link => {
             const href = link.getAttribute('href');
             if (href === currentPath) {
-                link.classList.add('text-pagani-gold');
-                // Add enhanced active state for mobile cards
+                if (link.classList.contains('nav-link')) {
+                    link.classList.add('nav-link-active');
+                }
+                if (link.classList.contains('mobile-nav-link')) {
+                    link.classList.add('mobile-nav-link-active');
+                }
                 if (link.classList.contains('mobile-nav-card')) {
-                    link.classList.add('bg-pagani-gold/20', 'border-pagani-gold');
+                    link.classList.add('mobile-nav-card-active');
                 }
             } else {
-                link.classList.remove('text-pagani-gold');
+                link.classList.remove('nav-link-active', 'mobile-nav-link-active');
                 if (link.classList.contains('mobile-nav-card')) {
-                    link.classList.remove('bg-pagani-gold/20', 'border-pagani-gold');
+                    link.classList.remove('mobile-nav-card-active');
                 }
             }
         });

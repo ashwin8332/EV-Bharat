@@ -8,13 +8,12 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import pickle
+import joblib
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Any, Optional
-import os
 from pathlib import Path
 import logging
-from sklearn.preprocessing import StandardScaler
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -65,9 +64,153 @@ class Alert(BaseModel):
 
 class BatteryAnalysis(BaseModel):
     status: str
-    predictions: Optional[BatteryPrediction]
-    analysis: Optional[Dict[str, Any]]
-    error: Optional[str]
+    predictions: Optional[BatteryPrediction] = None
+    analysis: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+
+
+class PassthroughScaler:
+    """Fallback scaler that preserves feature values but validates shape."""
+
+    def __init__(self, expected_features: int):
+        self.expected_features = expected_features
+
+    def transform(self, values: np.ndarray) -> np.ndarray:
+        array = np.asarray(values, dtype=np.float32)
+        if array.ndim == 1:
+            array = array.reshape(1, -1)
+
+        if array.shape[1] != self.expected_features:
+            raise ValueError(
+                f"Feature shape mismatch for scaler, expected {self.expected_features}, got {array.shape[1]}"
+            )
+
+        return array
+
+
+def _safe_float(value: Any, default: float) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _extract_feature_names() -> List[str]:
+    if not isinstance(model_config, dict):
+        return []
+
+    for key in ("feature_cols", "features"):
+        names = model_config.get(key)
+        if isinstance(names, list) and names:
+            return [str(name) for name in names]
+
+    return []
+
+
+def _get_expected_feature_count(model_key: str = "soc") -> int:
+    model = models.get(model_key)
+
+    if model is not None:
+        n_features = getattr(model, "n_features_in_", None)
+        if isinstance(n_features, (int, np.integer)) and int(n_features) > 0:
+            return int(n_features)
+
+        booster_getter = getattr(model, "get_booster", None)
+        if callable(booster_getter):
+            try:
+                booster_count = booster_getter().num_features()
+                if int(booster_count) > 0:
+                    return int(booster_count)
+            except Exception:
+                pass
+
+    feature_names = _extract_feature_names()
+    if feature_names:
+        return len(feature_names)
+
+    if isinstance(model_config, dict):
+        config_count = model_config.get("n_features")
+        if isinstance(config_count, (int, float)) and int(config_count) > 0:
+            return int(config_count)
+
+    return 8
+
+
+def _build_feature_lookup(input_data: BatteryInput) -> Dict[str, float]:
+    voltage = _safe_float(input_data.voltage, 3.7)
+    current = _safe_float(input_data.current, 0.0)
+    temperature = _safe_float(input_data.temperature, 25.0)
+    cycle_count = _safe_float(input_data.cycle_count if input_data.cycle_count is not None else 100, 100.0)
+    age_days = _safe_float(input_data.age_days if input_data.age_days is not None else 365, 365.0)
+
+    power = voltage * current
+    current_abs = abs(current)
+    current_sign = float(np.sign(current))
+    age_years = age_days / 365.0
+
+    voltage_norm = float(np.clip((voltage - 3.0) / 1.2, 0.0, 1.0))
+    temp_norm = (temperature - 25.0) / 25.0
+
+    overvoltage_risk = float(np.clip((voltage - 4.2) / 0.2, 0.0, 1.0))
+    undervoltage_risk = float(np.clip((3.2 - voltage) / 0.7, 0.0, 1.0))
+    overtemp_risk = float(np.clip((temperature - 40.0) / 20.0, 0.0, 1.0))
+    overcurrent_risk = float(np.clip((current_abs - 45.0) / 25.0, 0.0, 1.0))
+
+    # Provide non-zero variance approximations for rolling metrics.
+    voltage_std = max(abs(voltage) * 0.01, 0.001)
+    current_std = max(current_abs * 0.05, 0.001)
+    temp_std = max(abs(temperature) * 0.02, 0.001)
+    power_abs = abs(power)
+    power_std = max(power_abs * 0.05, 0.001)
+
+    internal_resistance = float(np.clip(0.03 + (age_years * 0.01) + (overtemp_risk * 0.01), 0.01, 0.2))
+    estimated_capacity = float(
+        np.clip(1.0 - min(age_years / 10.0, 0.6) - min(cycle_count / 5000.0, 0.3) - (overtemp_risk * 0.1), 0.2, 1.0)
+    )
+
+    return {
+        "Time": age_days,
+        "Current": current,
+        "Voltage": voltage,
+        "Temperature": temperature,
+        "Power": power,
+        "Energy_cumulative": abs(power) * max(cycle_count, 1.0) * 0.01,
+        "Internal_Resistance": internal_resistance,
+        "Resistance_rolling": internal_resistance,
+        "Voltage_derivative": 0.0,
+        "Voltage_derivative_2nd": 0.0,
+        "Current_abs": current_abs,
+        "Current_sign": current_sign,
+        "Current_derivative": 0.0,
+        "Temp_derivative": 0.0,
+        "Temp_normalized": temp_norm,
+        "Voltage_rolling_mean": voltage,
+        "Voltage_rolling_std": voltage_std,
+        "Voltage_rolling_min": voltage - voltage_std,
+        "Voltage_rolling_max": voltage + voltage_std,
+        "Current_rolling_mean": current,
+        "Current_rolling_std": current_std,
+        "Current_rolling_min": current - current_std,
+        "Current_rolling_max": current + current_std,
+        "Temperature_rolling_mean": temperature,
+        "Temperature_rolling_std": temp_std,
+        "Temperature_rolling_min": temperature - temp_std,
+        "Temperature_rolling_max": temperature + temp_std,
+        "Power_rolling_mean": power,
+        "Power_rolling_std": power_std,
+        "Power_rolling_min": power - power_std,
+        "Power_rolling_max": power + power_std,
+        "Time_normalized": float(np.clip(age_days / (365.0 * 10.0), 0.0, 1.0)),
+        "Time_since_start": age_days,
+        "Cell_age_indicator": age_years,
+        "Voltage_normalized": voltage_norm,
+        "Voltage_range_position": voltage_norm,
+        "Estimated_capacity_indicator": estimated_capacity,
+        "Overvoltage_risk": overvoltage_risk,
+        "Undervoltage_risk": undervoltage_risk,
+        "Overtemp_risk": overtemp_risk,
+        "Overcurrent_risk": overcurrent_risk,
+    }
 
 def load_models():
     """Load all ML models and scalers with error handling"""
@@ -95,30 +238,6 @@ def load_models():
             else:
                 logger.warning(f"⚠️  {filename} not found")
         
-        # Handle RUL scaler - create new one due to pickle compatibility issues
-        logger.info("🔧 Creating new RUL scaler due to compatibility issues...")
-        try:
-            # Create a new StandardScaler that's compatible
-            from sklearn.preprocessing import StandardScaler
-            new_scaler = StandardScaler()
-            
-            # Fit with reasonable battery feature ranges
-            # [voltage, current, temp, cycles, age, power, temp_norm, current_mag]
-            training_features = np.array([
-                [3.0, -50, -10, 0, 0, -150, -1.4, 50],      # Min values
-                [3.2, -30, 0, 50, 100, -96, -1.0, 30],     # Low values  
-                [3.7, -10, 25, 150, 400, -37, 0, 10],      # Mid values
-                [4.0, 0, 40, 500, 800, 0, 0.6, 0],         # High values
-                [4.2, 20, 60, 1000, 1500, 84, 1.4, 20],    # Max values
-            ])
-            
-            new_scaler.fit(training_features)
-            scalers['rul'] = new_scaler
-            logger.info("✅ Created new RUL scaler")
-            
-        except Exception as e:
-            logger.warning(f"⚠️  Failed to create RUL scaler: {e}")
-        
         # Load model config
         config_file = model_dir / 'model_config.pkl'
         if config_file.exists():
@@ -128,6 +247,21 @@ def load_models():
                 logger.info("✅ Loaded model configuration")
             except Exception as e:
                 logger.warning(f"⚠️  Failed to load model config: {e}")
+
+        # Load RUL scaler with joblib for cross-version compatibility.
+        scaler_file = model_dir / 'RUL_scaler.pkl'
+        if scaler_file.exists():
+            try:
+                scalers['rul'] = joblib.load(scaler_file)
+                logger.info("✅ Loaded RUL scaler from RUL_scaler.pkl")
+            except Exception as e:
+                logger.warning(f"⚠️  Failed to load RUL scaler with joblib: {e}")
+
+        # Fallback passthrough scaler keeps model path active even if scaler cannot be loaded.
+        if 'rul' in models and 'rul' not in scalers:
+            expected_features = _get_expected_feature_count('rul')
+            scalers['rul'] = PassthroughScaler(expected_features)
+            logger.info(f"✅ Using fallback passthrough scaler with {expected_features} features")
         
         # Create battery intelligence replacement (avoid pickle issues)
         logger.info("🔧 Creating new battery intelligence system...")
@@ -175,46 +309,37 @@ def load_models():
 def prepare_features(input_data: BatteryInput) -> np.ndarray:
     """Prepare input features for prediction based on actual model requirements"""
     try:
-        # Check model config for feature requirements
-        if model_config and 'features' in model_config:
-            feature_names = model_config['features']
-            logger.info(f"Using model features: {feature_names}")
-        
-        # Basic features that most models expect
-        features = [
-            input_data.voltage,
-            input_data.current,
-            input_data.temperature
-        ]
-        
-        # Add optional features if the model expects them
-        if input_data.cycle_count is not None:
-            features.append(input_data.cycle_count)
+        feature_lookup = _build_feature_lookup(input_data)
+        feature_names = _extract_feature_names()
+
+        if feature_names:
+            features = [feature_lookup.get(feature_name, 0.0) for feature_name in feature_names]
         else:
-            features.append(100)  # Default cycle count
-            
-        if input_data.age_days is not None:
-            features.append(input_data.age_days)
-        else:
-            features.append(365)  # Default age in days
-        
-        # Add derived features that might help with predictions
-        power = input_data.voltage * input_data.current
-        features.append(power)
-        
-        # Temperature normalized around 25°C (room temperature)
-        temp_normalized = (input_data.temperature - 25) / 25
-        features.append(temp_normalized)
-        
-        # Current magnitude (absolute value)
-        current_magnitude = abs(input_data.current)
-        features.append(current_magnitude)
-        
-        # Convert to numpy array and reshape for model input
-        feature_array = np.array(features).reshape(1, -1)
-        
+            fallback_order = [
+                "Voltage",
+                "Current",
+                "Temperature",
+                "Cell_age_indicator",
+                "Time_since_start",
+                "Power",
+                "Temp_normalized",
+                "Current_abs",
+            ]
+            features = [feature_lookup.get(feature_name, 0.0) for feature_name in fallback_order]
+
+        feature_array = np.array(features, dtype=np.float32).reshape(1, -1)
+
+        expected_count = _get_expected_feature_count('soc')
         logger.info(f"Prepared features shape: {feature_array.shape}")
-        logger.info(f"Feature values: {feature_array[0]}")
+        if feature_array.shape[1] <= 12:
+            logger.info(f"Feature values: {feature_array[0]}")
+        else:
+            logger.info(f"Feature preview: {feature_array[0][:8]} ...")
+
+        if feature_array.shape[1] != expected_count:
+            logger.warning(
+                f"Prepared features do not match model expectation: expected {expected_count}, got {feature_array.shape[1]}"
+            )
         
         return feature_array
         
@@ -222,14 +347,14 @@ def prepare_features(input_data: BatteryInput) -> np.ndarray:
         logger.error(f"Error preparing features: {e}")
         # Return basic features as fallback
         basic_features = [
-            input_data.voltage,
-            input_data.current, 
-            input_data.temperature,
-            100,  # Default cycle count
-            365,  # Default age
-            input_data.voltage * input_data.current,  # Power
-            (input_data.temperature - 25) / 25,  # Temp normalized
-            abs(input_data.current)  # Current magnitude
+            _safe_float(input_data.voltage, 3.7),
+            _safe_float(input_data.current, 0.0),
+            _safe_float(input_data.temperature, 25.0),
+            _safe_float(input_data.cycle_count if input_data.cycle_count is not None else 100, 100.0),
+            _safe_float(input_data.age_days if input_data.age_days is not None else 365, 365.0),
+            _safe_float(input_data.voltage, 3.7) * _safe_float(input_data.current, 0.0),
+            (_safe_float(input_data.temperature, 25.0) - 25.0) / 25.0,
+            abs(_safe_float(input_data.current, 0.0)),
         ]
         return np.array(basic_features).reshape(1, -1)
 
@@ -282,12 +407,22 @@ def predict_battery_metrics(input_data: BatteryInput) -> BatteryPrediction:
             predictions['SOH'] = min(100, (age_factor + cycle_factor) / 2 * 100)
             confidence_scores.append(0.65)
         
-        # RUL Prediction using actual model and scaler
-        if 'rul' in models and 'rul' in scalers:
+        # RUL Prediction using actual model and scaler (if available)
+        if 'rul' in models:
             try:
-                # Scale features for RUL model
-                features_scaled = scalers['rul'].transform(features)
-                rul_pred = models['rul'].predict(features_scaled)[0]
+                features_for_rul = features
+                if 'rul' in scalers:
+                    scaler = scalers['rul']
+                    scaler_feature_names = getattr(scaler, 'feature_names_in_', None)
+
+                    if scaler_feature_names is not None and len(scaler_feature_names) == features.shape[1]:
+                        scaler_input = pd.DataFrame(features, columns=list(scaler_feature_names))
+                    else:
+                        scaler_input = features
+
+                    features_for_rul = scaler.transform(scaler_input)
+
+                rul_pred = models['rul'].predict(features_for_rul)[0]
                 predictions['RUL'] = max(30, min(3000, int(rul_pred)))
                 confidence_scores.append(0.85)
                 logger.info(f"RUL prediction: {predictions['RUL']} days")
@@ -299,7 +434,7 @@ def predict_battery_metrics(input_data: BatteryInput) -> BatteryPrediction:
                 predictions['RUL'] = max(30, int(base_rul * soh_factor * soh_factor))
                 confidence_scores.append(0.70)
         else:
-            logger.warning("RUL model or scaler not available, using SOH-based estimation")
+            logger.warning("RUL model not available, using SOH-based estimation")
             soh_factor = predictions.get('SOH', 80) / 100
             base_rul = 1000
             predictions['RUL'] = max(30, int(base_rul * soh_factor))
