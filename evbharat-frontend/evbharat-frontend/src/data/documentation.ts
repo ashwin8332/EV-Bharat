@@ -61,6 +61,18 @@ export const documentationEntries: DocumentationEntry[] = [
         linkLabel: 'Read Manual'
     },
     {
+        id: 'User Manual',
+        title: 'EV Bharat User Manual',
+        summary: 'Official EV Bharat user manual available as an in-page PDF.',
+        category: 'general',
+        type: 'Guide',
+        status: 'published',
+        resourceType: 'pdf',
+        tags: ['manual', 'vehicle', 'owner-guide'],
+        link: '/images/doc/c.pdf',
+        linkLabel: 'Read Manual'
+    },
+    {
         id: 'Summary of hardware documentation',
         title: 'Summary of Hardware Documentation',
         summary: 'Overview of all hardware-related documentation for EV Bharat.',
