@@ -81,48 +81,48 @@ export class Navbar {
 
     private readonly evAuthNavGroups: NavGroup[] = [
         {
-            title: 'Operations',
+            title: 'CORE',
             requiresAuth: true,
             portal: 'ev',
             items: [
-                { label: 'Dashboard', path: '/dashboard', icon: 'fa-gauge-high', description: 'Dashboard' },
-                { label: 'Battery', path: '/battery', icon: 'fa-car-battery', description: 'Battery' },
-                { label: 'Routes', path: '/map', icon: 'fa-route', description: 'Routes' }
+                { label: 'Dashboard', path: '/dashboard', icon: 'fa-gauge-high', description: 'Real-time vehicle analytics' },
+                { label: 'Battery', path: '/battery', icon: 'fa-car-battery', description: 'In-depth battery health' },
+                { label: 'Routes', path: '/map', icon: 'fa-route', description: 'Intelligent route planning' },
+                { label: 'Alerts', path: '/alerts', icon: 'fa-bell', description: 'Critical vehicle notifications' },
             ]
         },
         {
-            title: 'Resources',
+            title: 'AI FEATURES',
             requiresAuth: true,
             portal: 'ev',
             items: [
-                { label: 'AI Chat', path: '/rag-chat', icon: 'fa-robot', description: 'AI Chat' },
-                { label: 'Drowsiness', path: '/drowsiness', icon: 'fa-eye', description: 'Driver Alertness' },
-                { label: 'Alerts', path: '/alerts', icon: 'fa-bell', description: 'Alerts' },
-                { label: 'Documentation', path: '/documentation', icon: 'fa-book-open', description: 'Docs' }
+                { label: 'AI Chat', path: '/rag-chat', icon: 'fa-robot', description: 'Ask our AI anything' },
+                { label: 'Drowsiness', path: '/drowsiness', icon: 'fa-eye', description: 'Driver alertness monitoring' },
+                { label: 'Documentation', path: '/documentation', icon: 'fa-book-open', description: 'Vehicle & system docs' }
             ]
         }
     ];
 
     private readonly factoryAuthNavGroups: NavGroup[] = [
         {
-            title: 'Control',
+            title: 'CONTROL',
             requiresAuth: true,
             portal: 'factory',
             items: [
-                { label: 'Factory', path: '/factory-dashboard', icon: 'fa-gauge-high', description: 'Factory Control Center' },
-                { label: 'EV Dashboard', path: '/dashboard', icon: 'fa-car-side', description: 'EV Dashboard' },
-                { label: 'AI Ops', path: '/rag-chat', icon: 'fa-robot', description: 'AI Operations' }
+                { label: 'Factory', path: '/factory-dashboard', icon: 'fa-industry', description: 'Factory Control Center' },
+                { label: 'EV Fleet', path: '/dashboard', icon: 'fa-car-side', description: 'Fleet-wide EV monitoring' },
+                { label: 'AI Ops', path: '/rag-chat', icon: 'fa-robot', description: 'AI-driven operational support' }
             ]
         },
         {
-            title: 'Monitoring',
+            title: 'MONITORING',
             requiresAuth: true,
             portal: 'factory',
             items: [
-                { label: 'Incidents', path: '/alerts', icon: 'fa-bell', description: 'Incidents' },
-                { label: 'Drowsiness', path: '/drowsiness', icon: 'fa-eye', description: 'Driver Alertness' },
-                { label: 'Camera Wall', path: '/gallery', icon: 'fa-camera', description: 'Camera Wall' },
-                { label: 'Documentation', path: '/documentation', icon: 'fa-book-open', description: 'Docs' }
+                { label: 'Incidents', path: '/alerts', icon: 'fa-triangle-exclamation', description: 'Fleet-wide incident reports' },
+                { label: 'Driver State', path: '/drowsiness', icon: 'fa-video', description: 'Driver alertness streams' },
+                { label: 'Camera Wall', path: '/gallery', icon: 'fa-border-all', description: 'Live camera feeds' },
+                { label: 'Documentation', path: '/documentation', icon: 'fa-book-open', description: 'Operational & technical docs' }
             ]
         }
     ];

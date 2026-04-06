@@ -1,122 +1,127 @@
+import { authService } from '../utils/auth';
+
 export class Footer {
     constructor() {
         this.render();
     }
 
     private render() {
+        if (authService.isAuthenticated()) {
+            return;
+        }
+
         const footerHTML = `
-            <footer class="relative z-20 bg-pagani-black border-t border-pagani-gold/20">
-                <div class="max-w-7xl mx-auto px-8 py-16">
-                    <!-- Main Footer Content -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
-                        <!-- Company -->
-                        <div>
-                            <h3 class="text-xl font-orbitron font-bold mb-6">
-                                EV<span class="text-pagani-gold">BHARAT</span>
-                            </h3>
-                            <p class="text-gray-400 text-sm leading-relaxed mb-6">
-                                Pioneering India's electric future with AI-powered intelligence and hypercar performance.
-                            </p>
-                            <div class="flex gap-4">
-                                <a href="#" class="w-10 h-10 border border-white/20 hover:border-pagani-gold flex items-center justify-center transition-colors group">
-                                    <span class="text-white group-hover:text-pagani-gold">𝕏</span>
-                                </a>
-                                <a href="#" class="w-10 h-10 border border-white/20 hover:border-pagani-gold flex items-center justify-center transition-colors group">
-                                    <span class="text-white group-hover:text-pagani-gold">in</span>
-                                </a>
-                                <a href="#" class="w-10 h-10 border border-white/20 hover:border-pagani-gold flex items-center justify-center transition-colors group">
-                                    <span class="text-white group-hover:text-pagani-gold">IG</span>
-                                </a>
-                                <a href="#" class="w-10 h-10 border border-white/20 hover:border-pagani-gold flex items-center justify-center transition-colors group">
-                                    <span class="text-white group-hover:text-pagani-gold">YT</span>
-                                </a>
-                            </div>
-                        </div>
+        <footer class="relative bg-black text-white overflow-hidden border-t border-white/10">
 
-                        <!-- Pages -->
-                        <div>
-                            <h4 class="text-sm font-orbitron tracking-widest uppercase mb-6 text-pagani-gold">Pages</h4>
-                            <ul class="space-y-3">
-                                <li><a href="/documentation" class="text-gray-400 hover:text-white transition-colors text-sm">Documentation</a></li>
-                                <li><a href="/dashboard" class="text-gray-400 hover:text-white transition-colors text-sm">Dashboard</a></li>
-                                <li><a href="/battery" class="text-gray-400 hover:text-white transition-colors text-sm">Battery Health</a></li>
-                                <li><a href="/map" class="text-gray-400 hover:text-white transition-colors text-sm">Route Planner</a></li>
-                                <li><a href="/alerts" class="text-gray-400 hover:text-white transition-colors text-sm">Alerts</a></li>
-                            </ul>
-                        </div>
+            <div class="max-w-7xl mx-auto px-6 md:px-10 py-20">
 
-                        <!-- Company -->
-                        <div>
-                            <h4 class="text-sm font-orbitron tracking-widest uppercase mb-6 text-pagani-gold">Company</h4>
-                            <ul class="space-y-3">
-                                <li><a href="/about" class="text-gray-400 hover:text-white transition-colors text-sm">About Us</a></li>
-                                <li><a href="/gallery" class="text-gray-400 hover:text-white transition-colors text-sm">Gallery</a></li>
-                                <li><a href="/technology" class="text-gray-400 hover:text-white transition-colors text-sm">Technology</a></li>
-                                <li><a href="/contact" class="text-gray-400 hover:text-white transition-colors text-sm">Contact</a></li>
-                            </ul>
-                        </div>
+                <!-- TOP GRID -->
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-12 mb-20">
 
-                        <!-- Newsletter -->
-                        <div>
-                            <h4 class="text-sm font-orbitron tracking-widest uppercase mb-6 text-pagani-gold">Stay Updated</h4>
-                            <p class="text-gray-400 text-sm mb-4">Get the latest news and updates</p>
-                            <form class="flex flex-col gap-3" id="newsletter-form">
-                                <input 
-                                    type="email" 
-                                    placeholder="Your email" 
-                                    class="bg-white/5 border border-white/10 px-4 py-2 text-sm focus:outline-none focus:border-pagani-gold transition-colors"
-                                    required
-                                />
-                                <button 
-                                    type="submit"
-                                    class="bg-pagani-gold text-black px-4 py-2 text-xs tracking-widest uppercase hover:bg-pagani-gold/90 transition-colors font-semibold"
-                                >
-                                    Subscribe
-                                </button>
-                            </form>
-                        </div>
+                    <!-- Brand -->
+                    <div>
+                        <h2 class="text-xl md:text-2xl font-orbitron font-bold mb-3 tracking-wide">
+                            <span class="text-white">EV</span><span class="text-pagani-gold">BHARAT</span>
+                        </h2>
+
+                        <p class="text-gray-400 text-xs leading-relaxed max-w-[180px]">
+                            Make mobility intelligent, sustainable and powerful.
+                        </p>
                     </div>
 
-                    <!-- Bottom Bar -->
-                    <div class="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-white/30 text-xs">
-                        <p>&copy; 2026 EVBharat Automotive. All rights reserved.</p>
-                        <div class="flex gap-8 uppercase tracking-widest">
-                            <a href="#" class="hover:text-pagani-gold transition-colors">Privacy</a>
-                            <a href="#" class="hover:text-pagani-gold transition-colors">Terms</a>
-                            <a href="#" class="hover:text-pagani-gold transition-colors">Legal</a>
-                        </div>
-                    </div>
+                    ${this.renderColumn("FEATURES", [
+                        { name: "Technology", path: "/technology" },
+                        { name: "Gallery", path: "/gallery" },
+                        { name: "Documentation", path: "/documentation" },
+                    ])}
+                    ${this.renderColumn("TECHNOLOGY", [
+                        { name: "AI Systems", path: "/technology" },
+                        { name: "Battery", path: "/battery" },
+                        { name: "Analytics", path: "/battery-analytics" },
+                    ])}
+                    ${this.renderColumn("COMMUNITY", [
+                        { name: "Dashboard", path: "/dashboard" },
+                        { name: "AI Chat", path: "/rag-chat" },
+                        { name: "Map", path: "/map" },
+                    ])}
+                    ${this.renderColumn("COMPANY", [
+                        { name: "About", path: "/about" },
+                        { name: "Contact", path: "/contact" },
+                    ])}
 
-                    <!-- Back to Top Button -->
-                    <button 
-                        id="back-to-top"
-                        class="fixed bottom-8 right-8 w-12 h-12 bg-pagani-gold text-black flex items-center justify-center opacity-0 pointer-events-none transition-opacity hover:bg-pagani-gold/90"
-                        aria-label="Back to top"
-                    >
-                        ↑
-                    </button>
                 </div>
-            </footer>
+
+                <!-- HUGE BRAND TEXT -->
+                <div class="relative text-center overflow-hidden">
+
+                    <h1 class="whitespace-nowrap text-[12vw] max-w-full
+                               font-orbitron font-bold leading-none tracking-tight
+                               transform -translate-x-[4%] md:-translate-x-[5%]">
+
+                        <span class="text-white/90">EV</span><span class="text-pagani-gold">
+                            BHARAT
+                        </span>
+
+                    </h1>
+
+                    <!-- Bottom Fade -->
+                    <div class="absolute bottom-0 left-0 w-full h-24 bg-gradient-to-t from-black to-transparent"></div>
+
+                </div>
+
+                <!-- Bottom Bar -->
+                <div class="mt-10 flex flex-col md:flex-row justify-between items-center text-xs text-gray-500 gap-4">
+
+                    <p>© 2026 EVBharat Automotive. All rights reserved.</p>
+
+                    <div class="flex gap-6 uppercase tracking-widest">
+                        <a href="#" class="hover:text-pagani-gold transition">Privacy</a>
+                        <a href="#" class="hover:text-pagani-gold transition">Terms</a>
+                        <a href="#" class="hover:text-pagani-gold transition">Legal</a>
+                    </div>
+
+                </div>
+
+                <!-- Back to Top -->
+                <button 
+                    id="back-to-top"
+                    class="fixed bottom-6 right-6 w-10 h-10 bg-pagani-gold text-black flex items-center justify-center opacity-0 pointer-events-none transition hover:scale-110"
+                >
+                    ↑
+                </button>
+
+            </div>
+        </footer>
         `;
 
         document.body.insertAdjacentHTML('beforeend', footerHTML);
         this.attachEventListeners();
     }
 
-    private attachEventListeners() {
-        // Newsletter form
-        const form = document.getElementById('newsletter-form');
-        form?.addEventListener('submit', (e) => {
-            e.preventDefault();
-            alert('Thank you for subscribing! 🎉');
-            (e.target as HTMLFormElement).reset();
-        });
+    private renderColumn(title: string, items: { name: string, path: string }[]) {
+        return `
+        <div>
+            <h4 class="text-gray-500 text-xs tracking-[0.25em] mb-5">
+                ${title}
+            </h4>
+            <ul class="space-y-2">
+                ${items.map(item => `
+                    <li>
+                        <a href="${item.path}" class="text-gray-300 hover:text-white transition">
+                            ${item.name}
+                        </a>
+                    </li>
+                `).join("")}
+            </ul>
+        </div>
+        `;
+    }
 
-        // Back to top button
+    private attachEventListeners() {
         const backToTop = document.getElementById('back-to-top');
 
         window.addEventListener('scroll', () => {
-            if (window.scrollY > 500) {
+            if (window.scrollY > 400) {
                 backToTop?.classList.remove('opacity-0', 'pointer-events-none');
             } else {
                 backToTop?.classList.add('opacity-0', 'pointer-events-none');
