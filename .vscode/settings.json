@@ -1,6 +1,12 @@
 {
     "python-envs.defaultEnvManager": "ms-python.python:system",
-    "python-envs.pythonProjects": [],
+    "python-envs.pythonProjects": [
+        {
+            "path": ".venv/include/python3.12",
+            "envManager": "ms-python.python:system",
+            "packageManager": "ms-python.python:pip"
+        }
+    ],
     "python.defaultInterpreterPath": "/workspaces/ev/evbharat-frontend/evbharat-frontend/backend/EVBharat Bot/venv/bin/python",
     "python.analysis.extraPaths": [
         "/workspaces/ev/evbharat-frontend/evbharat-frontend/backend/EVBharat Bot/venv/lib/python3.12/site-packages"

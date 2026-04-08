@@ -3,6 +3,7 @@
 # EVBharat RAG Backend Startup Script
 
 echo "🚀 Starting EVBharat RAG Backend..."
+RAG_PORT="${RAG_BACKEND_PORT:-9000}"
 
 # Navigate to the EVBharat Bot directory
 cd "$(dirname "$0")"
@@ -35,10 +36,10 @@ else
 fi
 
 # Start the FastAPI server
-echo "🌐 Starting RAG API server on http://localhost:8001..."
-echo "📖 API documentation will be available at http://localhost:8001/docs"
+echo "🌐 Starting RAG API server on http://localhost:${RAG_PORT}..."
+echo "📖 API documentation will be available at http://localhost:${RAG_PORT}/docs"
 echo ""
 echo "Press Ctrl+C to stop the server"
 echo ""
 
-uvicorn rag_api:app --host 0.0.0.0 --port 8001 --reload
+uvicorn rag_api:app --host 0.0.0.0 --port "${RAG_PORT}" --reload

@@ -1,0 +1,7 @@
+{
+  "session_id": "77aebe31-1bd8-422b-ab94-a586ca66a141",
+  "chunk_count": 4,
+  "created_at": 1775673614.703932,
+  "backend": "faiss",
+  "embedding_model": "local-hash-auto"
+}

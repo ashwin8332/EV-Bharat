@@ -5,6 +5,7 @@ A FastAPI-based backend that provides Retrieval-Augmented Generation (RAG) capab
 ## Features
 
 - **PDF Upload & Processing**: Upload PDFs and extract text and tables using the Unstructured library
+- **FAISS Vector Storage**: Embeddings are indexed in per-session FAISS indexes under `data/faiss_indexes/`
 - **AI-Powered Chat**: Chat with your documents using Google Gemini AI
 - **Session Management**: Each uploaded document creates a session for isolated conversations
 - **RESTful API**: Clean REST API endpoints for frontend integration
@@ -22,13 +23,13 @@ cd "/workspaces/ev/evbharat-frontend/evbharat-frontend/backend/EVBharat Bot"
 ./start_rag_backend.sh
 ```
 
-The server will start on `http://localhost:8001`
+The server will start on `http://localhost:9000`
 
 ### 2. API Documentation
 
 Once the server is running, visit:
-- **Interactive API Docs**: http://localhost:8001/docs
-- **Alternative Docs**: http://localhost:8001/redoc
+- **Interactive API Docs**: http://localhost:9000/docs
+- **Alternative Docs**: http://localhost:9000/redoc
 
 ## API Endpoints
 
@@ -92,6 +93,14 @@ Create a `.env` file with the following variables:
 ```env
 GOOGLE_API_KEY=your_google_api_key_here
 GROQ_API_KEY=your_groq_api_key_here  # Optional, for alternative models
+RAG_EMBEDDING_MODEL=models/gemini-embedding-001
+RAG_EMBEDDING_MODELS=models/gemini-embedding-001,models/text-embedding-004,models/embedding-001
+RAG_EMBEDDING_PROVIDER=google         # google | local-hash
+RAG_EMBEDDING_ALLOW_LOCAL_FALLBACK=true
+LOCAL_HASH_EMBED_DIM=768              # Used when provider is local-hash or quota fallback triggers
+TTS_PROVIDER=auto                     # auto | edge | gtts
+TTS_MAX_CHARS=1800                    # Trim long replies to keep TTS responsive
+TTS_CACHE_MAX_ITEMS=64                # In-memory audio cache size
 ```
 
 ## File Structure
@@ -113,7 +122,9 @@ Key dependencies include:
 - **Uvicorn**: ASGI server
 - **Unstructured**: PDF processing
 - **LangChain**: AI workflow orchestration
+- **FAISS**: Vector index for embedding retrieval
 - **Google Generative AI**: Gemini AI integration
+- **edge-tts / gTTS**: Speech synthesis engines
 
 ## Usage Examples
 
@@ -125,13 +136,13 @@ The frontend TypeScript code can interact with the API like this:
 // Upload PDF
 const formData = new FormData();
 formData.append('file', pdfFile);
-const uploadResponse = await fetch('http://localhost:8001/upload', {
+const uploadResponse = await fetch('http://localhost:9000/upload', {
     method: 'POST',
     body: formData
 });
 
 // Chat with document
-const chatResponse = await fetch('http://localhost:8001/chat', {
+const chatResponse = await fetch('http://localhost:9000/chat', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({

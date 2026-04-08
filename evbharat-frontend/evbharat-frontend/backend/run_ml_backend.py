@@ -62,6 +62,13 @@ def run_backend():
     sys.path.insert(0, str(models_dir))
     sys.path.insert(0, str(drowsiness_dir))
 
+    ml_port_raw = os.getenv("ML_BACKEND_PORT", "8000")
+    try:
+        ml_port = int(ml_port_raw)
+    except ValueError:
+        print(f"⚠️  Invalid ML_BACKEND_PORT='{ml_port_raw}', defaulting to 8000")
+        ml_port = 8000
+
     try:
         import importlib.util
 
@@ -94,14 +101,14 @@ def run_backend():
         if not camera_started:
             camera_error = getattr(drowsiness_api_module.camera, "camera_error", "Camera unavailable")
             print(f"   Reason: {camera_error}")
-        print("🌐 API base: http://localhost:8000")
-        print("🧪 Battery health: http://localhost:8000/health")
-        print("🧪 Drowsiness status: http://localhost:8000/drowsiness/status")
+        print(f"🌐 API base: http://localhost:{ml_port}")
+        print(f"🧪 Battery health: http://localhost:{ml_port}/health")
+        print(f"🧪 Drowsiness status: http://localhost:{ml_port}/drowsiness/status")
 
         uvicorn.run(
             app,
             host="0.0.0.0",
-            port=8000,
+            port=ml_port,
             reload=False,
             log_level="info"
         )

@@ -76,7 +76,7 @@ class EVAdvisorService {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text, language, slow }),
-        }, 1);
+        }, 1, 60_000);
         if (!r.ok) {
             const e = await r.json().catch(() => ({ detail: 'Text to speech failed' }));
             throw new Error(e.detail || 'Text to speech failed');
@@ -98,12 +98,12 @@ class EVAdvisorService {
      *   Access-Control-Allow-Origin: * which browsers reject when
      *   credentials are included (CORS specification).
      */
-    private async fetchR(url: string, opts: RequestInit, retries = 2): Promise<Response> {
+    private async fetchR(url: string, opts: RequestInit, retries = 2, timeoutMs = 30_000): Promise<Response> {
         let last: Error | null = null;
         for (let i = 0; i <= retries; i++) {
             try {
                 const ac = new AbortController();
-                const t = setTimeout(() => ac.abort(), 30_000);
+                const t = setTimeout(() => ac.abort(), timeoutMs);
                 const r = await fetch(url, { ...opts, signal: ac.signal });
                 clearTimeout(t);
                 if ((r.status === 429 || r.status === 503) && i < retries) { await this.wait(2 ** i * 1000); continue; }
