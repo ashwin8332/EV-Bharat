@@ -1,7 +1,4 @@
 # EV Bharat
-
-Professional setup and operations guide for first-time developers.
-
 ---
 
 ## 1. Project Overview
