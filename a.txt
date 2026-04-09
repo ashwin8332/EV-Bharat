@@ -1,4 +1,4 @@
-# EV-Bharat Runbook
+# EV-Bharat
 
 Professional setup and operations guide for first-time developers.
 
