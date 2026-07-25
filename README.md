@@ -6,7 +6,6 @@
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 EV-Bharat is a state-of-the-art, AI-integrated platform engineered to streamline Electric Vehicle (EV) adoption and management in the Indian market. It bridges the gap between low-level vehicle hardware (ESP32/BMS) and high-level predictive intelligence.
-
 ---
 
 ## 🏗️ System Architecture
