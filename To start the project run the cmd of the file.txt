@@ -1,0 +1,13 @@
+cd /workspaces/ev/evbharat-frontend/evbharat-frontend/backend && npm install
+cd /workspaces/ev/evbharat-frontend/evbharat-frontend/backend && npm run dev
+cd /workspaces/ev/evbharat-frontend/evbharat-frontend/backend && npm start
+cd /workspaces/ev/evbharat-frontend/evbharat-frontend && npm install
+cd /workspaces/ev/evbharat-frontend/evbharat-frontend && npm run dev
+cd /workspaces/ev/evbharat-frontend/evbharat-frontend/backend && python run_ml_backend.py
+
+cd "/workspaces/ev/evbharat-frontend/evbharat-frontend/backend/EVBharat Bot" && source venv/bin/activate && uvicorn rag_api:app --host 0.0.0.0 --port 8001 --reload
+cd /workspaces/ev/evbharat-frontend/evbharat-frontend/backend && python test_models.py
+
+cd backend     
+cd EVBharatBot
+Set-Location "C:\Users\hp\OneDrive\Desktop\EV-Bharat\evbharat\backend\EvBharatBot"; if (Test-Path ".\venv\Scripts\python.exe") { .\venv\Scripts\python.exe -m uvicorn rag_api:app --host 0.0.0.0 --port 9000 --reload } else { C:/Python313/python.exe -m uvicorn rag_api:app --host 0.0.0.0 --port 9000 --reload }(Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned) ; (& c:\Users\hp\OneDrive\Desktop\EV-Bharat\evbharat\.venv\Scripts\Activate.ps1)
