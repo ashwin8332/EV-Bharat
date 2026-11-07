@@ -1,4 +1,4 @@
-# EV-Bharat: Intelligent Electric Vehicle Ecosystem
+# EV-Bharat
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0%2B-blue.svg)](https://www.typescriptlang.org/)
